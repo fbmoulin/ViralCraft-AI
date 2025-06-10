@@ -17,4 +17,4 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd ViralCraft-AI && npm start"
+args = "cd ViralCraft-AI && npm install && npm start"
