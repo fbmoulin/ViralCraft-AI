@@ -20,7 +20,7 @@ app.use(express.static('public'));
 // Initialize AI services with better error handling
 const initializeAIServices = () => {
   console.log('🤖 Initializing AI services...');
-  
+
   // Initialize OpenAI
   try {
     if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here') {
@@ -88,17 +88,17 @@ let Content;
 const connectDB = async () => {
   try {
     console.log('📊 Initializing database connection...');
-    
+
     // Use the database service
     const databaseService = require('./services/database');
     const connected = await databaseService.initialize();
-    
+
     if (connected) {
       console.log('✅ Database connected successfully');
-      
+
       // Set global reference for routes
       global.db = databaseService;
-      
+
       return true;
     } else {
       console.warn('⚠️ Database connection failed, running in memory mode');
@@ -110,7 +110,7 @@ const connectDB = async () => {
     return false;
   }
 };
-      
+
 
 // API Routes
 app.get('/api/health', async (req, res) => {

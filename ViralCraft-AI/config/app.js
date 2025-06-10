@@ -29,5 +29,9 @@ module.exports = {
       url: process.env.REDIS_URL,
       enabled: !!process.env.REDIS_URL
     }
+  },
+  content: {
+    contentTypes: ['social', 'blog', 'video', 'email', 'ad'],
+    platforms: ['instagram', 'tiktok', 'youtube', 'twitter', 'facebook', 'linkedin']
   }
 };

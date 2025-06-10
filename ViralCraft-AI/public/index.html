@@ -262,7 +262,7 @@
 
     <!-- Scripts carregados de forma otimizada -->
     <script src="/static/js/modernized-app.min.js" defer></script>
-    
+
     <!-- Carregamento assíncrono de recursos não críticos -->
     <script>
         // Carregamento assíncrono de recursos adicionais
@@ -278,7 +278,7 @@
                     document.body.appendChild(script);
                 });
             }
-            
+
             // Carregar scripts adicionais quando necessário
             if ('IntersectionObserver' in window) {
                 const lazyImages = document.querySelectorAll('.lazy-load');
@@ -292,7 +292,7 @@
                         }
                     });
                 });
-                
+
                 lazyImages.forEach(img => {
                     imageObserver.observe(img);
                 });
