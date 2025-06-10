@@ -1,17 +1,42 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
+const helmet = require('helmet');
 const path = require('path');
 const multer = require('multer');
-// PostgreSQL imports
-const { Sequelize, DataTypes } = require('sequelize');
 const fs = require('fs');
+const rateLimit = require('express-rate-limit');
+const morgan = require('morgan');
+const logger = require('./utils/logger');
+const { systemMonitoring, requestLogging, errorTracking, getHealthData } = require('./middleware/monitoring');
+
+// Initialize global error handlers
+require('./utils/error-handler');
 
 // Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Logging setup
+const morganFormat = process.env.NODE_ENV === 'production' ? 'combined' : 'dev';
+app.use(morgan(morganFormat, {
+  stream: {
+    write: (message) => logger.info(message.trim())
+  }
+}));
+
+// Monitoring middleware
+app.use(systemMonitoring);
+app.use(requestLogging);
+
+// Security and compression middleware
 // Middleware
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
+}));
+app.use(compression());
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -113,37 +138,63 @@ const connectDB = async () => {
 
 
 // API Routes
+// Enhanced health check endpoint with monitoring
 app.get('/api/health', async (req, res) => {
-  // Get database status
-  let dbStatus = { connected: false, type: 'none' };
-  if (global.db) {
-    const healthCheck = await global.db.healthCheck();
-    dbStatus = {
-      connected: healthCheck.status === 'connected',
-      type: healthCheck.type || 'unknown',
-      contentCount: healthCheck.contentCount
-    };
-  }
+  try {
+    let dbStatus = { connected: false };
 
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    uptime: Math.floor(process.uptime()) + ' seconds',
-    memory: process.memoryUsage().rss / 1024 / 1024 + ' MB',
-    services: {
-      database: dbStatus,
-      openai: {
-        configured: !!global.openai,
-        key: global.openai ? 'valid' : 'missing'
-      },
-      anthropic: {
-        configured: !!global.anthropic,
-        key: global.anthropic ? 'valid' : 'missing'
+    if (global.db && global.db.isConnected) {
+      try {
+        const healthCheck = await global.db.healthCheck();
+        dbStatus = {
+          connected: true,
+          type: healthCheck.type,
+          contentCount: healthCheck.contentCount
+        };
+      } catch (error) {
+        logger.error('Database health check failed', error);
+        dbStatus = { 
+          connected: false, 
+          error: error.message
+        };
       }
-    },
-    environment: process.env.NODE_ENV || 'development',
-    version: '1.0.1'
-  });
+    }
+
+    const healthData = getHealthData();
+
+    res.json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      uptime: Math.floor(process.uptime()) + ' seconds',
+      memory: healthData.memory,
+      cpu: healthData.cpu,
+      services: {
+        database: dbStatus,
+        openai: {
+          configured: !!global.openai,
+          key: global.openai ? 'valid' : 'missing'
+        },
+        anthropic: {
+          configured: !!global.anthropic,
+          key: global.anthropic ? 'valid' : 'missing'
+        }
+      },
+      monitoring: {
+        errors: healthData.logs.errors,
+        warnings: healthData.logs.warnings,
+        lastErrors: healthData.logs.lastErrors
+      },
+      environment: process.env.NODE_ENV || 'development',
+      version: '1.0.2'
+    });
+  } catch (error) {
+    logger.error('Health check endpoint error', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Extract data from files
@@ -507,6 +558,10 @@ try {
   console.error('❌ Error initializing YouTube routes:', error.message);
 }
 
+// Routes
+app.use('/api/youtube', require('./routes/youtube-routes'));
+app.use('/api/logs', require('./routes/logs-routes'));
+
 // Default route - serve index.html
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -550,6 +605,9 @@ app.use((err, req, res, next) => {
   // Send response
   res.status(statusCode).json(errorResponse);
 });
+
+// Error handling middleware (must be last)
+app.use(errorTracking);
 
 // Utility function to log server info
 const logServerInfo = (port, dbConnected) => {
