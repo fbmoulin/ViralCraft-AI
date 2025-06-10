@@ -54,7 +54,19 @@ document.addEventListener('DOMContentLoaded', function() {
   // Verificação de status do sistema
   async function checkSystemStatus() {
     try {
-      const response = await fetch('/api/health');
+      const response = await fetch('/api/health', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        timeout: 10000
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
       const data = await response.json();
       
       if (statusContainer) {
@@ -65,7 +77,16 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch (error) {
       console.error('Erro ao verificar status:', error);
       showNotification('Não foi possível conectar ao servidor', 'error');
-      throw error;
+      
+      // Fallback status for offline mode
+      return {
+        status: 'offline',
+        services: {
+          database: { connected: false },
+          openai: { configured: false },
+          anthropic: { configured: false }
+        }
+      };
     }
   }
   

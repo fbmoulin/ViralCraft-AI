@@ -18,7 +18,17 @@ class DatabaseService {
       
       const options = {
         ...config.database.options,
-        dialect: isSqlite ? 'sqlite' : 'postgres'
+        dialect: isSqlite ? 'sqlite' : 'postgres',
+        retry: {
+          max: 3,
+          timeout: 5000
+        },
+        pool: {
+          max: 10,
+          min: 0,
+          acquire: 30000,
+          idle: 10000
+        }
       };
 
       // Add SSL for PostgreSQL in production
