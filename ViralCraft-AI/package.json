@@ -2,9 +2,9 @@
   "name": "soulclap-content-creator",
   "version": "1.0.0",
   "description": "Viral multiplatform content creation with AI",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node index.js",
+    "start": "node server.js",
     "dev": "nodemon index.js",
     "build": "echo 'No build step required'",
     "lint": "eslint .",

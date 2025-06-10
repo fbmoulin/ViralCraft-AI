@@ -17,36 +17,48 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static('public'));
 
-// Initialize AI services
+// Initialize AI services with better error handling
 const initializeAIServices = () => {
+  console.log('🤖 Initializing AI services...');
+  
+  // Initialize OpenAI
   try {
-    // Dynamically import OpenAI if API key is available
-    if (process.env.OPENAI_API_KEY) {
+    if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here') {
       const { OpenAI } = require('openai');
       global.openai = new OpenAI({
         apiKey: process.env.OPENAI_API_KEY
       });
       console.log('✅ OpenAI service initialized');
     } else {
-      console.warn('⚠️ OpenAI API key not set');
+      console.warn('⚠️ OpenAI API key not set (set OPENAI_API_KEY in environment)');
       global.openai = null;
     }
+  } catch (error) {
+    console.error('❌ Failed to initialize OpenAI:', error.message);
+    global.openai = null;
+  }
 
-    // Dynamically import Anthropic if API key is available
-    if (process.env.ANTHROPIC_API_KEY) {
+  // Initialize Anthropic
+  try {
+    if (process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'your_anthropic_api_key_here') {
       const { Anthropic } = require('@anthropic-ai/sdk');
       global.anthropic = new Anthropic({
         apiKey: process.env.ANTHROPIC_API_KEY
       });
       console.log('✅ Anthropic service initialized');
     } else {
-      console.warn('⚠️ Anthropic API key not set');
+      console.warn('⚠️ Anthropic API key not set (set ANTHROPIC_API_KEY in environment)');
       global.anthropic = null;
     }
   } catch (error) {
-    console.warn('⚠️ AI services not fully configured:', error.message);
-    global.openai = null;
+    console.error('❌ Failed to initialize Anthropic:', error.message);
     global.anthropic = null;
+  }
+
+  // Enable demo mode if no AI services are available
+  if (!global.openai && !global.anthropic) {
+    console.log('🎭 No AI services configured, running in demo mode');
+    console.log('💡 Tip: Set OPENAI_API_KEY or ANTHROPIC_API_KEY for full functionality');
   }
 };
 
@@ -780,7 +792,12 @@ const startServer = async () => {
   }
 };
 
-// Start the server
+// Start the server with debug logging
+console.log('🚀 Starting ViralCraft-AI server...');
+console.log('📍 Node.js version:', process.version);
+console.log('📍 Working directory:', process.cwd());
+console.log('📍 Environment:', process.env.NODE_ENV || 'development');
+
 startServer();
 
 module.exports = app; // Export for testing
