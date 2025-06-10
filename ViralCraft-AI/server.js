@@ -110,183 +110,19 @@ const connectDB = async () => {
     return false;
   }
 };
-      sequelize = new Sequelize(process.env.DATABASE_URL, options);
-
-      // Define Content model with database-specific types
-      Content = sequelize.define('Content', {
-        title: {
-          type: DataTypes.STRING,
-          allowNull: false
-        },
-        type: {
-          type: DataTypes.STRING, // blog, social, email, etc
-          allowNull: false
-        },
-        platform: {
-          type: DataTypes.STRING, // instagram, twitter, linkedin, etc
-          allowNull: false
-        },
-        content: {
-          type: isSqlite ? DataTypes.TEXT : DataTypes.JSONB, // For storing structured JSON data
-          allowNull: false,
-          get() {
-            const value = this.getDataValue('content');
-            return typeof value === 'string' ? JSON.parse(value) : value;
-          },
-          set(value) {
-            this.setDataValue('content', isSqlite ? JSON.stringify(value) : value);
-          }
-        },
-        metadata: {
-          type: isSqlite ? DataTypes.TEXT : DataTypes.JSONB,
-          defaultValue: '{}',
-          get() {
-            const value = this.getDataValue('metadata');
-            return typeof value === 'string' ? JSON.parse(value) : value;
-          },
-          set(value) {
-            this.setDataValue('metadata', isSqlite ? JSON.stringify(value) : value);
-          }
-        },
-        keywords: {
-          type: isSqlite ? DataTypes.TEXT : DataTypes.ARRAY(DataTypes.STRING),
-          defaultValue: isSqlite ? '[]' : [],
-          get() {
-            const value = this.getDataValue('keywords');
-            return typeof value === 'string' ? JSON.parse(value) : value;
-          },
-          set(value) {
-            this.setDataValue('keywords', isSqlite ? JSON.stringify(value) : value);
-          }
-        },
-        status: {
-          type: DataTypes.STRING,
-          defaultValue: 'draft'
-        },
-        userId: {
-          type: DataTypes.STRING
-        },
-        createdAt: {
-          type: DataTypes.DATE,
-          defaultValue: DataTypes.NOW
-        },
-        updatedAt: {
-          type: DataTypes.DATE,
-          defaultValue: DataTypes.NOW
-        }
-      });
-
-      // Sync model with database (create table if not exists)
-      await sequelize.authenticate();
-      console.log(`✅ Connected to ${isSqlite ? 'SQLite' : 'PostgreSQL'}`);
       
-      await sequelize.sync();
-      return true;
-    } catch (error) {
-      console.error(`❌ Database error:`, error.message);
-      
-      // If PostgreSQL connection fails, try SQLite as fallback
-      if (!isSqlite) {
-        console.log('🔄 Attempting to fall back to SQLite database...');
-        try {
-          const sqliteOptions = {
-            dialect: 'sqlite',
-            storage: './soulclap.db',
-            logging: false
-          };
-
-          sequelize = new Sequelize(sqliteOptions);
-
-          // Define Content model with SQLite compatible types
-          Content = sequelize.define('Content', {
-            title: {
-              type: DataTypes.STRING,
-              allowNull: false
-            },
-            type: {
-              type: DataTypes.STRING,
-              allowNull: false
-            },
-            platform: {
-              type: DataTypes.STRING,
-              allowNull: false
-            },
-            content: {
-              type: DataTypes.TEXT,
-              allowNull: false,
-              get() {
-                const value = this.getDataValue('content');
-                return typeof value === 'string' ? JSON.parse(value) : value;
-              },
-              set(value) {
-                this.setDataValue('content', JSON.stringify(value));
-              }
-            },
-            metadata: {
-              type: DataTypes.TEXT,
-              defaultValue: '{}',
-              get() {
-                const value = this.getDataValue('metadata');
-                return typeof value === 'string' ? JSON.parse(value) : value;
-              },
-              set(value) {
-                this.setDataValue('metadata', JSON.stringify(value));
-              }
-            },
-            keywords: {
-              type: DataTypes.TEXT,
-              defaultValue: '[]',
-              get() {
-                const value = this.getDataValue('keywords');
-                return typeof value === 'string' ? JSON.parse(value) : value;
-              },
-              set(value) {
-                this.setDataValue('keywords', JSON.stringify(value));
-              }
-            },
-            status: {
-              type: DataTypes.STRING,
-              defaultValue: 'draft'
-            },
-            userId: {
-              type: DataTypes.STRING
-            },
-            createdAt: {
-              type: DataTypes.DATE,
-              defaultValue: DataTypes.NOW
-            },
-            updatedAt: {
-              type: DataTypes.DATE,
-              defaultValue: DataTypes.NOW
-            }
-          });
-
-          await sequelize.authenticate();
-          await sequelize.sync();
-
-          console.log('✅ Connected to SQLite (fallback)');
-          return true;
-        } catch (sqliteError) {
-          console.error('❌ SQLite fallback also failed:', sqliteError.message);
-        }
-      }
-      
-      console.warn('⚠️ Running with limited functionality (no content persistence)');
-      return false;
-    }
-  } catch (error) {
-    console.error('❌ Fatal database error:', error.message);
-    console.warn('⚠️ Running with limited functionality (no content persistence)');
-    return false;
-  }
-};
 
 // API Routes
-app.get('/api/health', (req, res) => {
-  // Determine database type
-  let dbType = 'none';
-  if (sequelize) {
-    dbType = sequelize.options.dialect || 'unknown';
+app.get('/api/health', async (req, res) => {
+  // Get database status
+  let dbStatus = { connected: false, type: 'none' };
+  if (global.db) {
+    const healthCheck = await global.db.healthCheck();
+    dbStatus = {
+      connected: healthCheck.status === 'connected',
+      type: healthCheck.type || 'unknown',
+      contentCount: healthCheck.contentCount
+    };
   }
 
   res.json({ 
@@ -295,10 +131,7 @@ app.get('/api/health', (req, res) => {
     uptime: Math.floor(process.uptime()) + ' seconds',
     memory: process.memoryUsage().rss / 1024 / 1024 + ' MB',
     services: {
-      database: {
-        connected: !!sequelize,
-        type: dbType
-      },
+      database: dbStatus,
       openai: {
         configured: !!global.openai,
         key: global.openai ? 'valid' : 'missing'
@@ -461,8 +294,8 @@ Configure your API keys to get real AI-generated content!`;
 
     // Save to database (if connected)
     try {
-      if (sequelize) {
-        await Content.create({
+      if (global.db && global.db.isConnected) {
+        await global.db.createContent({
           title: topic,
           type: contentType,
           platform: platform,
@@ -599,12 +432,10 @@ app.post('/api/suggest', async (req, res) => {
 // Get all content
 app.get('/api/content', async (req, res) => {
   try {
-    if (!sequelize) {
+    if (!global.db || !global.db.isConnected) {
       return res.status(404).json({ error: 'Database not connected' });
     }
-    const contents = await Content.findAll({
-      order: [['createdAt', 'DESC']]
-    });
+    const contents = await global.db.getContent();
     res.json({ success: true, contents });
   } catch (error) {
     res.status(500).json({ error: 'Error fetching content', details: error.message });
@@ -614,10 +445,10 @@ app.get('/api/content', async (req, res) => {
 // Get content by ID
 app.get('/api/content/:id', async (req, res) => {
   try {
-    if (!sequelize) {
+    if (!global.db || !global.db.isConnected) {
       return res.status(404).json({ error: 'Database not connected' });
     }
-    const content = await Content.findByPk(req.params.id);
+    const content = await global.db.getContentById(req.params.id);
     if (!content) {
       return res.status(404).json({ error: 'Content not found' });
     }
@@ -630,17 +461,13 @@ app.get('/api/content/:id', async (req, res) => {
 // Update content
 app.put('/api/content/:id', async (req, res) => {
   try {
-    if (!sequelize) {
+    if (!global.db || !global.db.isConnected) {
       return res.status(404).json({ error: 'Database not connected' });
     }
-    const content = await Content.findByPk(req.params.id);
-    if (!content) {
+    const updatedContent = await global.db.updateContent(req.params.id, req.body);
+    if (!updatedContent) {
       return res.status(404).json({ error: 'Content not found' });
     }
-    const updatedContent = await content.update({
-      ...req.body,
-      updatedAt: new Date()
-    });
     res.json({ success: true, content: updatedContent });
   } catch (error) {
     res.status(500).json({ error: 'Error updating content', details: error.message });
