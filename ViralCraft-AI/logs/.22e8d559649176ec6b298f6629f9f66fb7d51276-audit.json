@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/home/runner/workspace/ViralCraft-AI/logs/.22e8d559649176ec6b298f6629f9f66fb7d51276-audit.json",
+    "files": [
+        {
+            "date": 1749547830082,
+            "name": "/home/runner/workspace/ViralCraft-AI/logs/error-2025-06-10.log",
+            "hash": "e4fbc45e0e3359d45cfa8b927fff838ea6b8d3163db16f52545c088ae18a998a"
+        }
+    ],
+    "hashType": "sha256"
+}
