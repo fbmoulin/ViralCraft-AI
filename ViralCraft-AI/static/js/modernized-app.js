@@ -8,15 +8,15 @@ document.addEventListener('DOMContentLoaded', function() {
   const statusContainer = document.getElementById('status-container');
   const formContainer = document.getElementById('form-container');
   const resultContainer = document.getElementById('result-container');
-  
+
   // Inicialização da aplicação
   initApp();
-  
+
   // Função principal de inicialização
   function initApp() {
     // Mostrar tela de carregamento
     showLoadingScreen();
-    
+
     // Verificar status do sistema
     checkSystemStatus()
       .then(() => {
@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
         initFormValidation();
         initFileUpload();
         setupFormSubmission();
-        
+
         // Esconder tela de carregamento após inicialização
         setTimeout(hideLoadingScreen, 1500);
       })
@@ -34,14 +34,14 @@ document.addEventListener('DOMContentLoaded', function() {
         hideLoadingScreen();
       });
   }
-  
+
   // Gerenciamento da tela de carregamento
   function showLoadingScreen() {
     if (loadingScreen) {
       loadingScreen.classList.remove('fade-out');
     }
   }
-  
+
   function hideLoadingScreen() {
     if (loadingScreen) {
       loadingScreen.classList.add('fade-out');
@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }, 500);
     }
   }
-  
+
   // Verificação de status do sistema
   async function checkSystemStatus() {
     try {
@@ -62,22 +62,22 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         timeout: 10000
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
+
       const data = await response.json();
-      
+
       if (statusContainer) {
         updateSystemStatus(data);
       }
-      
+
       return data;
     } catch (error) {
       console.error('Erro ao verificar status:', error);
       showNotification('Não foi possível conectar ao servidor', 'error');
-      
+
       // Fallback status for offline mode
       return {
         status: 'offline',
@@ -89,7 +89,7 @@ document.addEventListener('DOMContentLoaded', function() {
       };
     }
   }
-  
+
   // Atualização visual do status do sistema
   function updateSystemStatus(data) {
     // Atualizar uptime
@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (uptimeEl) {
       uptimeEl.textContent = data.uptime || '0s';
     }
-    
+
     // Atualizar status da IA
     const aiStatusEl = document.querySelector('.status-value[data-status="ai"]');
     if (aiStatusEl) {
@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', function() {
         ? '<span class="status-dot"></span> Ativo' 
         : '<span class="status-dot" style="background-color: var(--color-error)"></span> Inativo';
     }
-    
+
     // Atualizar status do banco de dados
     const dbStatusEl = document.querySelector('.status-value[data-status="database"]');
     if (dbStatusEl) {
@@ -115,59 +115,59 @@ document.addEventListener('DOMContentLoaded', function() {
         ? '<span class="status-dot"></span> Conectado' 
         : '<span class="status-dot" style="background-color: var(--color-error)"></span> Desconectado';
     }
-    
+
     // Atualizar status do servidor
     const serverStatusEl = document.querySelector('.status-value[data-status="server"]');
     if (serverStatusEl) {
       serverStatusEl.innerHTML = '<span class="status-dot"></span> Online';
     }
-    
+
     // Mostrar notificação de status
     showNotification('Status atualizado!', 'info');
   }
-  
+
   // Sistema de abas para organização do formulário
   function initTabs() {
     const tabs = document.querySelectorAll('.tab');
     const tabContents = document.querySelectorAll('.tab-content');
-    
+
     if (tabs.length === 0 || tabContents.length === 0) return;
-    
+
     tabs.forEach(tab => {
       tab.addEventListener('click', () => {
         // Remover classe ativa de todas as abas
         tabs.forEach(t => t.classList.remove('active'));
         tabContents.forEach(c => c.classList.remove('active'));
-        
+
         // Adicionar classe ativa à aba clicada
         tab.classList.add('active');
-        
+
         // Mostrar conteúdo correspondente
         const targetId = tab.getAttribute('data-tab');
         const targetContent = document.getElementById(targetId);
         if (targetContent) {
           targetContent.classList.add('active');
         }
-        
+
         // Atualizar barra de progresso
         updateProgressBar();
       });
     });
-    
+
     // Ativar primeira aba por padrão
     tabs[0].click();
   }
-  
+
   // Barra de progresso para navegação entre etapas
   function updateProgressBar() {
     const progressBar = document.querySelector('.progress-bar-fill');
     const tabs = document.querySelectorAll('.tab');
     const activeTabIndex = Array.from(tabs).findIndex(tab => tab.classList.contains('active'));
-    
+
     if (progressBar && activeTabIndex !== -1) {
       const progress = (activeTabIndex / (tabs.length - 1)) * 100;
       progressBar.style.width = `${progress}%`;
-      
+
       // Atualizar status das etapas
       const steps = document.querySelectorAll('.progress-step');
       steps.forEach((step, index) => {
@@ -183,16 +183,16 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     }
   }
-  
+
   // Validação de formulário em tempo real
   function initFormValidation() {
     const formInputs = document.querySelectorAll('.form-input, .form-select, .form-textarea');
-    
+
     formInputs.forEach(input => {
       input.addEventListener('blur', () => {
         validateInput(input);
       });
-      
+
       input.addEventListener('input', () => {
         // Remover mensagens de erro ao digitar
         const errorMessage = input.parentElement.querySelector('.error-message');
@@ -203,23 +203,23 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     });
   }
-  
+
   function validateInput(input) {
     const value = input.value.trim();
     const isRequired = input.hasAttribute('required');
-    
+
     // Remover mensagem de erro anterior
     const existingError = input.parentElement.querySelector('.error-message');
     if (existingError) {
       existingError.remove();
     }
-    
+
     // Validar campo obrigatório
     if (isRequired && value === '') {
       showInputError(input, 'Este campo é obrigatório');
       return false;
     }
-    
+
     // Validações específicas por tipo
     if (input.type === 'email' && value !== '') {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -228,7 +228,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return false;
       }
     }
-    
+
     // Validação de URL
     if (input.type === 'url' && value !== '') {
       try {
@@ -238,37 +238,37 @@ document.addEventListener('DOMContentLoaded', function() {
         return false;
       }
     }
-    
+
     return true;
   }
-  
+
   function showInputError(input, message) {
     input.classList.add('error');
-    
+
     const errorElement = document.createElement('div');
     errorElement.className = 'error-message';
     errorElement.style.color = 'var(--color-error)';
     errorElement.style.fontSize = '0.75rem';
     errorElement.style.marginTop = '0.25rem';
     errorElement.textContent = message;
-    
+
     input.parentElement.appendChild(errorElement);
   }
-  
+
   // Upload de arquivos com preview
   function initFileUpload() {
     const fileInputs = document.querySelectorAll('input[type="file"]');
-    
+
     fileInputs.forEach(input => {
       const button = input.parentElement.querySelector('.file-upload-button');
       const previewContainer = input.parentElement.querySelector('.file-preview');
-      
+
       if (button) {
         button.addEventListener('click', () => {
           input.click();
         });
       }
-      
+
       input.addEventListener('change', () => {
         if (input.files.length > 0) {
           const file = input.files[0];
@@ -277,19 +277,19 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     });
   }
-  
+
   function updateFilePreview(file, previewContainer, button) {
     if (!previewContainer) return;
-    
+
     // Limpar preview anterior
     previewContainer.innerHTML = '';
     previewContainer.style.display = 'block';
-    
+
     // Atualizar texto do botão
     if (button) {
       button.textContent = file.name;
     }
-    
+
     // Criar preview baseado no tipo de arquivo
     if (file.type.startsWith('image/')) {
       const img = document.createElement('img');
@@ -297,13 +297,13 @@ document.addEventListener('DOMContentLoaded', function() {
       img.style.maxHeight = '150px';
       img.style.borderRadius = 'var(--border-radius-sm)';
       img.style.marginTop = 'var(--spacing-sm)';
-      
+
       const reader = new FileReader();
       reader.onload = e => {
         img.src = e.target.result;
       };
       reader.readAsDataURL(file);
-      
+
       previewContainer.appendChild(img);
     } else {
       // Para outros tipos de arquivo, mostrar ícone e nome
@@ -313,21 +313,21 @@ document.addEventListener('DOMContentLoaded', function() {
       fileInfo.style.alignItems = 'center';
       fileInfo.style.gap = 'var(--spacing-sm)';
       fileInfo.style.marginTop = 'var(--spacing-sm)';
-      
+
       const icon = document.createElement('span');
       icon.textContent = getFileIcon(file.type);
       icon.style.fontSize = '1.5rem';
-      
+
       const name = document.createElement('span');
       name.textContent = file.name;
       name.style.wordBreak = 'break-all';
-      
+
       fileInfo.appendChild(icon);
       fileInfo.appendChild(name);
       previewContainer.appendChild(fileInfo);
     }
   }
-  
+
   function getFileIcon(fileType) {
     if (fileType.startsWith('image/')) return '🖼️';
     if (fileType === 'application/pdf') return '📄';
@@ -336,29 +336,29 @@ document.addEventListener('DOMContentLoaded', function() {
     if (fileType.includes('text/')) return '📃';
     return '📎';
   }
-  
+
   // Configuração do envio do formulário
   function setupFormSubmission() {
     const form = document.getElementById('content-form');
     const generateButton = document.getElementById('generate-button');
     const suggestButton = document.getElementById('suggest-button');
-    
+
     if (!form) return;
-    
+
     if (generateButton) {
       generateButton.addEventListener('click', async (e) => {
         e.preventDefault();
-        
+
         // Validar formulário antes de enviar
         if (!validateForm(form)) {
           showNotification('Por favor, corrija os erros no formulário', 'error');
           return;
         }
-        
+
         // Mostrar estado de carregamento
         generateButton.disabled = true;
         generateButton.innerHTML = '<span class="spinner"></span> Gerando...';
-        
+
         try {
           await generateContent(form);
           generateButton.disabled = false;
@@ -370,11 +370,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       });
     }
-    
+
     if (suggestButton) {
       suggestButton.addEventListener('click', async (e) => {
         e.preventDefault();
-        
+
         // Validar campos básicos
         const topicInput = form.querySelector('input[name="topic"]');
         if (!topicInput || !topicInput.value.trim()) {
@@ -382,11 +382,11 @@ document.addEventListener('DOMContentLoaded', function() {
           showNotification('Informe um tópico para receber sugestões', 'error');
           return;
         }
-        
+
         // Mostrar estado de carregamento
         suggestButton.disabled = true;
         suggestButton.innerHTML = '<span class="spinner"></span> Sugerindo...';
-        
+
         try {
           await suggestContent(form);
           suggestButton.disabled = false;
@@ -399,25 +399,25 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     }
   }
-  
+
   function validateForm(form) {
     const requiredInputs = form.querySelectorAll('[required]');
     let isValid = true;
-    
+
     requiredInputs.forEach(input => {
       if (!validateInput(input)) {
         isValid = false;
       }
     });
-    
+
     return isValid;
   }
-  
+
   // Geração de conteúdo
   async function generateContent(form) {
     const formData = new FormData(form);
     const payload = {};
-    
+
     // Converter FormData para objeto
     for (const [key, value] of formData.entries()) {
       if (key === 'keywords') {
@@ -432,7 +432,7 @@ document.addEventListener('DOMContentLoaded', function() {
         payload[key] = value;
       }
     }
-    
+
     // Processar upload de arquivo se existir
     if (payload.file) {
       try {
@@ -443,7 +443,7 @@ document.addEventListener('DOMContentLoaded', function() {
         showNotification('Não foi possível processar o arquivo', 'error');
       }
     }
-    
+
     // Enviar requisição para gerar conteúdo
     try {
       const response = await fetch('/api/generate', {
@@ -453,31 +453,40 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         body: JSON.stringify(payload)
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Erro ao gerar conteúdo');
       }
-      
+
       const data = await response.json();
       displayGeneratedContent(data);
       showNotification('Conteúdo gerado com sucesso!', 'success');
-      
+
       // Scroll para o resultado
       if (resultContainer) {
         resultContainer.scrollIntoView({ behavior: 'smooth' });
       }
     } catch (error) {
       console.error('Erro na geração:', error);
-      throw error;
+      let errorMessage = 'Erro na geração de conteúdo';
+
+      if (error.response) {
+        errorMessage = error.response.data?.error || errorMessage;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      showNotification(errorMessage, 'error');
+      return null;
     }
   }
-  
+
   // Sugestão de conteúdo
   async function suggestContent(form) {
     const formData = new FormData(form);
     const payload = {};
-    
+
     // Converter FormData para objeto
     for (const [key, value] of formData.entries()) {
       if (key === 'keywords') {
@@ -487,7 +496,7 @@ document.addEventListener('DOMContentLoaded', function() {
         payload[key] = value;
       }
     }
-    
+
     // Enviar requisição para sugerir conteúdo
     try {
       const response = await fetch('/api/suggest', {
@@ -497,12 +506,12 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         body: JSON.stringify(payload)
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Erro ao sugerir conteúdo');
       }
-      
+
       const data = await response.json();
       displaySuggestion(data);
       showNotification('Sugestão gerada com sucesso!', 'success');
@@ -511,24 +520,24 @@ document.addEventListener('DOMContentLoaded', function() {
       throw error;
     }
   }
-  
+
   // Extração de conteúdo de arquivo
   async function extractFileContent(file) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('type', file.type);
-    
+
     try {
       const response = await fetch('/api/extract', {
         method: 'POST',
         body: formData
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Erro ao extrair conteúdo');
       }
-      
+
       const data = await response.json();
       return data.data;
     } catch (error) {
@@ -536,27 +545,27 @@ document.addEventListener('DOMContentLoaded', function() {
       throw error;
     }
   }
-  
+
   // Exibição de conteúdo gerado
   function displayGeneratedContent(data) {
     if (!resultContainer) return;
-    
+
     // Mostrar container de resultado
     resultContainer.classList.remove('hidden');
-    
+
     // Obter plataforma selecionada
     const platform = document.querySelector('select[name="platform"]').value;
     const content = data.content[platform];
-    
+
     // Converter markdown para HTML
     const htmlContent = convertMarkdownToHtml(content);
-    
+
     // Atualizar conteúdo
     const resultContent = resultContainer.querySelector('.result-content');
     if (resultContent) {
       resultContent.innerHTML = htmlContent;
     }
-    
+
     // Adicionar botões de ação
     const actionButtons = resultContainer.querySelector('.result-actions');
     if (actionButtons) {
@@ -570,17 +579,17 @@ document.addEventListener('DOMContentLoaded', function() {
       `;
     }
   }
-  
+
   // Exibição de sugestão
   function displaySuggestion(data) {
     const suggestion = data.suggestion;
-    
+
     // Preencher campos com sugestão
     const titleInput = document.querySelector('input[name="topic"]');
     if (titleInput && suggestion.title) {
       titleInput.value = suggestion.title;
     }
-    
+
     // Mostrar sugestão em modal ou área dedicada
     const suggestionContainer = document.getElementById('suggestion-container');
     if (suggestionContainer) {
@@ -593,13 +602,13 @@ document.addEventListener('DOMContentLoaded', function() {
           <div class="suggestion-content">
             <h4>Título Sugerido</h4>
             <p>${suggestion.title || 'Sem sugestão de título'}</p>
-            
+
             <h4 class="mt-4">Estrutura Sugerida</h4>
             <div>${convertMarkdownToHtml(suggestion.outline || 'Sem sugestão de estrutura')}</div>
-            
+
             <h4 class="mt-4">Hook Sugerido</h4>
             <p><em>${suggestion.hook || 'Sem sugestão de hook'}</em></p>
-            
+
             <div class="mt-6 text-center">
               <button class="btn btn-primary" onclick="applyContentSuggestion()">
                 Aplicar Sugestão
@@ -610,11 +619,11 @@ document.addEventListener('DOMContentLoaded', function() {
       `;
     }
   }
-  
+
   // Converter markdown para HTML (versão simplificada)
   function convertMarkdownToHtml(markdown) {
     if (!markdown) return '';
-    
+
     // Substituições básicas de markdown
     let html = markdown
       // Headers
@@ -638,16 +647,16 @@ document.addEventListener('DOMContentLoaded', function() {
       .replace(/\[([^\]]+)\]\(([^)]+)\)/gim, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
       // Line breaks
       .replace(/\n/gim, '<br>');
-    
+
     // Fechar listas
     html = html
       .replace(/<\/li>\s*<li>/gim, '</li>\n<li>')
       .replace(/<\/li>\s*<\/ul>/gim, '</li>\n</ul>')
       .replace(/<\/li>\s*<\/ol>/gim, '</li>\n</ol>');
-    
+
     return html;
   }
-  
+
   // Sistema de notificações
   function showNotification(message, type = 'info') {
     // Remover notificações existentes
@@ -655,25 +664,25 @@ document.addEventListener('DOMContentLoaded', function() {
     existingNotifications.forEach(notification => {
       notification.remove();
     });
-    
+
     // Criar nova notificação
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
-    
+
     // Ícone baseado no tipo
     let icon = '💬';
     if (type === 'success') icon = '✅';
     if (type === 'error') icon = '❌';
     if (type === 'info') icon = 'ℹ️';
-    
+
     notification.innerHTML = `
       <div class="notification-icon">${icon}</div>
       <div class="notification-message">${message}</div>
     `;
-    
+
     // Adicionar ao DOM
     document.body.appendChild(notification);
-    
+
     // Remover após alguns segundos
     setTimeout(() => {
       notification.style.opacity = '0';
@@ -682,7 +691,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }, 300);
     }, 3000);
   }
-  
+
   // Funções globais (expostas para uso em HTML)
   window.copyToClipboard = function() {
     const content = document.querySelector('.result-content').innerText;
@@ -695,33 +704,33 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error('Erro ao copiar:', err);
       });
   };
-  
+
   window.downloadContent = function() {
     const content = document.querySelector('.result-content').innerText;
     const title = document.querySelector('input[name="topic"]').value.trim() || 'conteudo';
     const filename = title.toLowerCase().replace(/\s+/g, '-') + '.md';
-    
+
     const blob = new Blob([content], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
-    
+
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
     document.body.appendChild(a);
     a.click();
-    
+
     setTimeout(() => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }, 100);
-    
+
     showNotification('Conteúdo baixado como ' + filename, 'success');
   };
-  
+
   window.applyContentSuggestion = function() {
     const suggestionContainer = document.getElementById('suggestion-container');
     if (!suggestionContainer) return;
-    
+
     // Obter título sugerido
     const titleElement = suggestionContainer.querySelector('h4 + p');
     if (titleElement) {
@@ -730,7 +739,7 @@ document.addEventListener('DOMContentLoaded', function() {
         titleInput.value = titleElement.textContent;
       }
     }
-    
+
     // Obter hook sugerido
     const hookElement = suggestionContainer.querySelector('h4 + p em');
     if (hookElement) {
@@ -739,10 +748,10 @@ document.addEventListener('DOMContentLoaded', function() {
         contextInput.value = hookElement.textContent;
       }
     }
-    
+
     // Esconder container de sugestão
     suggestionContainer.classList.add('hidden');
-    
+
     showNotification('Sugestão aplicada com sucesso!', 'success');
   };
 });

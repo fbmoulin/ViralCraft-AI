@@ -3,7 +3,11 @@ const express = require('express');
 const router = express.Router();
 const logger = require('../utils/logger');
 const fs = require('fs');
+const express = require('express');
+const router = express.Router();
 const path = require('path');
+const fs = require('fs');
+const logger = require('../utils/logger');
 
 // Get recent logs
 router.get('/recent', (req, res) => {
@@ -15,6 +19,29 @@ router.get('/recent', (req, res) => {
     });
   } catch (error) {
     logger.error('Error fetching log stats', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get error logs specifically
+router.get('/errors', (req, res) => {
+  try {
+    const stats = logger.getStats();
+    const recentErrors = stats.lastErrors || [];
+    
+    res.json({
+      success: true,
+      data: {
+        totalErrors: stats.errorCount,
+        recentErrors: recentErrors,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    logger.error('Error fetching error logs', error);
     res.status(500).json({
       success: false,
       error: error.message

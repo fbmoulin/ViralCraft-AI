@@ -1,4 +1,4 @@
-const ytdl = require('ytdl-core');
+// ytdl-core already declared above
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');

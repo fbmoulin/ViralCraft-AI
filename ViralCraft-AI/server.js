@@ -389,8 +389,9 @@ app.post('/api/generate', async (req, res) => {
       // Use Claude for main content generation
       const response = await global.anthropic.messages.create({
         model: "claude-3-sonnet-20240229",
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
+        messages: [
+          { role: "user", content: `${systemPrompt}\n\n${userPrompt}` }
+        ],
         max_tokens: 4000
       });
 
@@ -568,6 +569,34 @@ app.get('/api/content', async (req, res) => {
     res.json({ success: true, contents });
   } catch (error) {
     res.status(500).json({ error: 'Error fetching content', details: error.message });
+  }
+});
+
+// Real-time error monitoring
+app.get('/api/errors/realtime', async (req, res) => {
+  try {
+    const healthData = getHealthData();
+    const recentErrors = healthData.logs.lastErrors || [];
+    
+    res.json({
+      success: true,
+      data: {
+        totalErrors: healthData.logs.errors,
+        totalWarnings: healthData.logs.warnings,
+        recentErrors: recentErrors.slice(-5), // Last 5 errors
+        systemHealth: {
+          memory: healthData.memory,
+          uptime: healthData.uptime,
+          status: recentErrors.length > 3 ? 'warning' : 'healthy'
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error monitoring endpoint failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
   }
 });
 
