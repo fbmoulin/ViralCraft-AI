@@ -1,8 +1,15 @@
-
 const ytdl = require('ytdl-core');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const { promisify } = require('util');
+const { v4: uuidv4 } = require('uuid');
+
+// Convert fs functions to promise-based
+const writeFileAsync = promisify(fs.writeFile);
+const readFileAsync = promisify(fs.readFile);
+const mkdirAsync = promisify(fs.mkdir);
+const readdirAsync = promisify(fs.readdir);
 
 /**
  * YouTube video analyzer utility
@@ -21,40 +28,52 @@ class YouTubeAnalyzer {
         throw new Error('Invalid YouTube URL');
       }
 
+      console.log(`📊 Getting video info for: ${videoUrl}`);
+
       // Get video info
       const videoInfo = await ytdl.getInfo(videoUrl);
-      
+
       // Extract basic metadata
       const metadata = {
         title: videoInfo.videoDetails.title,
         description: videoInfo.videoDetails.description,
         author: videoInfo.videoDetails.author.name,
         channelUrl: videoInfo.videoDetails.author.channel_url,
+        channelId: videoInfo.videoDetails.channelId,
         lengthSeconds: parseInt(videoInfo.videoDetails.lengthSeconds),
         viewCount: parseInt(videoInfo.videoDetails.viewCount),
         uploadDate: videoInfo.videoDetails.uploadDate,
+        publishDate: videoInfo.videoDetails.publishDate,
         keywords: videoInfo.videoDetails.keywords || [],
-        thumbnailUrl: videoInfo.videoDetails.thumbnails[0].url,
+        thumbnailUrl: videoInfo.videoDetails.thumbnails[0]?.url,
         category: videoInfo.videoDetails.category,
         isLiveContent: videoInfo.videoDetails.isLiveContent,
       };
 
-      // Get top comments (limited to 50)
-      const comments = videoInfo.comments ? 
-        videoInfo.comments.slice(0, 50).map(comment => ({
-          author: comment.author.name,
-          text: comment.text,
-          likes: comment.likes,
-          publishedAt: comment.publishedAt,
-        })) : [];
+      // Extract engagement metrics
+      const engagement = {
+        likeCount: parseInt(videoInfo.videoDetails.likes) || 0,
+        dislikeCount: parseInt(videoInfo.videoDetails.dislikes) || 0,
+        commentCount: parseInt(videoInfo.videoDetails.comments) || 0,
+      };
 
       // Create the analysis object
       const analysis = {
+        id: uuidv4(),
         videoId: videoInfo.videoDetails.videoId,
         url: videoUrl,
         metadata,
-        comments,
+        engagement,
+        formats: videoInfo.formats.slice(0, 5).map(format => ({
+          quality: format.qualityLabel,
+          mimeType: format.mimeType,
+          container: format.container,
+          hasAudio: format.hasAudio,
+          hasVideo: format.hasVideo,
+          bitrate: format.bitrate,
+        })),
         analysisDate: new Date().toISOString(),
+        timestamp: new Date().toISOString(),
       };
 
       return analysis;
@@ -72,111 +91,6 @@ class YouTubeAnalyzer {
    */
   static async saveAnalysisToJson(analysis, outputPath = null) {
     try {
-      const fileName = `youtube_${analysis.videoId}_${Date.now()}.json`;
-      const filePath = outputPath || path.join(__dirname, '../data', fileName);
-      
-      // Ensure the directory exists
-      const dir = path.dirname(filePath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      
-      // Write the analysis to a file
-      fs.writeFileSync(filePath, JSON.stringify(analysis, null, 2));
-      
-      return filePath;
-    } catch (error) {
-      console.error('Failed to save analysis:', error.message);
-      throw error;
-    }
-  }
-}
-
-module.exports = YouTubeAnalyzer;
-const ytdl = require('ytdl-core');
-const fs = require('fs');
-const path = require('path');
-const { promisify } = require('util');
-const { v4: uuidv4 } = require('uuid');
-
-// Convert fs functions to promise-based
-const writeFileAsync = promisify(fs.writeFile);
-const readFileAsync = promisify(fs.readFile);
-const mkdirAsync = promisify(fs.mkdir);
-const readdirAsync = promisify(fs.readdir);
-
-class YouTubeAnalyzer {
-  /**
-   * Analyze a YouTube video
-   * @param {string} url - The YouTube video URL
-   * @returns {object} Analysis results
-   */
-  static async analyzeVideo(url) {
-    try {
-      // Validate the YouTube URL
-      if (!ytdl.validateURL(url)) {
-        throw new Error('Invalid YouTube URL');
-      }
-
-      console.log(`Getting info for: ${url}`);
-      
-      // Get video information
-      const info = await ytdl.getInfo(url);
-      
-      // Extract metadata
-      const metadata = {
-        title: info.videoDetails.title,
-        author: info.videoDetails.author.name,
-        channelId: info.videoDetails.channelId,
-        viewCount: parseInt(info.videoDetails.viewCount, 10),
-        lengthSeconds: parseInt(info.videoDetails.lengthSeconds, 10),
-        publishDate: info.videoDetails.publishDate,
-        description: info.videoDetails.description,
-        category: info.videoDetails.category,
-        thumbnailUrl: info.videoDetails.thumbnails[0]?.url,
-        keywords: info.videoDetails.keywords || [],
-        isLiveContent: info.videoDetails.isLiveContent,
-      };
-
-      // Extract engagement metrics
-      const engagement = {
-        likeCount: info.videoDetails.likes || 0,
-        dislikeCount: info.videoDetails.dislikes || 0,
-        commentCount: info.videoDetails.comments || 0,
-      };
-
-      // Build the analysis object
-      const analysis = {
-        id: uuidv4(),
-        url,
-        metadata,
-        engagement,
-        videoId: info.videoDetails.videoId,
-        formats: info.formats.map(format => ({
-          quality: format.qualityLabel,
-          mimeType: format.mimeType,
-          container: format.container,
-          hasAudio: format.hasAudio,
-          hasVideo: format.hasVideo,
-          bitrate: format.bitrate,
-        })),
-        timestamp: new Date().toISOString(),
-      };
-
-      return analysis;
-    } catch (error) {
-      console.error('YouTube analysis error:', error.message);
-      throw error;
-    }
-  }
-
-  /**
-   * Save analysis to JSON file
-   * @param {object} analysis - The analysis object
-   * @returns {string} The file path where analysis was saved
-   */
-  static async saveAnalysisToJson(analysis) {
-    try {
       // Ensure data directory exists
       const dataDir = path.join(__dirname, '..', 'data');
       if (!fs.existsSync(dataDir)) {
@@ -191,15 +105,15 @@ class YouTubeAnalyzer {
 
       // Create filename from video ID and timestamp
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const filename = `${analysis.videoId || 'video'}_${timestamp}.json`;
-      const filePath = path.join(youtubeDir, filename);
+      const fileName = `${analysis.videoId || 'video'}_${timestamp}.json`;
+      const filePath = outputPath || path.join(youtubeDir, fileName);
 
-      // Write the analysis to file
+      // Write the analysis to a file
       await writeFileAsync(filePath, JSON.stringify(analysis, null, 2), 'utf8');
-      
+
       return filePath;
     } catch (error) {
-      console.error('Error saving analysis:', error);
+      console.error('Failed to save analysis:', error.message);
       throw error;
     }
   }
@@ -211,7 +125,7 @@ class YouTubeAnalyzer {
   static async getAllAnalyses() {
     try {
       const youtubeDir = path.join(__dirname, '..', 'data', 'youtube');
-      
+
       // Check if directory exists
       if (!fs.existsSync(youtubeDir)) {
         return [];
@@ -228,7 +142,7 @@ class YouTubeAnalyzer {
         }
       }
 
-      return analyses;
+      return analyses.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     } catch (error) {
       console.error('Error getting analyses:', error);
       throw error;

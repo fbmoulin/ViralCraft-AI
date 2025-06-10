@@ -40,6 +40,15 @@ async function setupDatabase() {
       // Display database info
       const healthCheck = await databaseService.healthCheck();
       console.log('📊 Database status:', healthCheck);
+
+      // Test API integration
+      console.log('\n🔗 Testing API integration...');
+      try {
+        const testAPIs = require('./test-apis');
+        await testAPIs();
+      } catch (error) {
+        console.warn('⚠️ API integration test failed:', error.message);
+      }
       
     } else {
       console.error('❌ Failed to setup database');

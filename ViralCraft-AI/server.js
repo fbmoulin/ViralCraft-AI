@@ -40,7 +40,9 @@ app.use(compression());
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-app.use(express.static('public'));
+// Serve static files from multiple directories
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/static', express.static(path.join(__dirname, 'static')));
 
 // Initialize AI services with better error handling
 const initializeAIServices = () => {
@@ -138,6 +140,82 @@ const connectDB = async () => {
 
 
 // API Routes
+// API Integration Test Endpoint
+app.get('/api/test-integration', async (req, res) => {
+  const tests = {
+    database: { status: 'unknown', details: '' },
+    openai: { status: 'unknown', details: '' },
+    anthropic: { status: 'unknown', details: '' },
+    youtube: { status: 'unknown', details: '' },
+    staticFiles: { status: 'unknown', details: '' }
+  };
+
+  // Test Database
+  try {
+    if (global.db && global.db.isConnected) {
+      await global.db.healthCheck();
+      tests.database = { status: 'ok', details: 'Connected and responsive' };
+    } else {
+      tests.database = { status: 'error', details: 'Not connected' };
+    }
+  } catch (error) {
+    tests.database = { status: 'error', details: error.message };
+  }
+
+  // Test OpenAI
+  try {
+    if (global.openai) {
+      tests.openai = { status: 'ok', details: 'API key configured' };
+    } else {
+      tests.openai = { status: 'error', details: 'API key not configured' };
+    }
+  } catch (error) {
+    tests.openai = { status: 'error', details: error.message };
+  }
+
+  // Test Anthropic
+  try {
+    if (global.anthropic) {
+      tests.anthropic = { status: 'ok', details: 'API key configured' };
+    } else {
+      tests.anthropic = { status: 'error', details: 'API key not configured' };
+    }
+  } catch (error) {
+    tests.anthropic = { status: 'error', details: error.message };
+  }
+
+  // Test YouTube analyzer
+  try {
+    const YouTubeAnalyzer = require('./utils/youtube-analyzer');
+    tests.youtube = { status: 'ok', details: 'YouTube analyzer loaded successfully' };
+  } catch (error) {
+    tests.youtube = { status: 'error', details: error.message };
+  }
+
+  // Test static files
+  try {
+    const staticCssPath = path.join(__dirname, 'static', 'css', 'modernized-style.css');
+    const staticJsPath = path.join(__dirname, 'static', 'js', 'modernized-app.js');
+    
+    if (fs.existsSync(staticCssPath) && fs.existsSync(staticJsPath)) {
+      tests.staticFiles = { status: 'ok', details: 'Static files accessible' };
+    } else {
+      tests.staticFiles = { status: 'error', details: 'Static files not found' };
+    }
+  } catch (error) {
+    tests.staticFiles = { status: 'error', details: error.message };
+  }
+
+  const overallStatus = Object.values(tests).every(test => test.status === 'ok') ? 'ok' : 'partial';
+
+  res.json({
+    success: true,
+    overallStatus,
+    tests,
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Enhanced health check endpoint with monitoring
 app.get('/api/health', async (req, res) => {
   try {
@@ -549,7 +627,7 @@ app.post('/api/generate-image', async (req, res) => {
   }
 });
 
-// Add YouTube routes
+// Initialize routes with error handling
 try {
   const youtubeRoutes = require('./routes/youtube-routes');
   app.use('/api/youtube', youtubeRoutes);
@@ -558,9 +636,13 @@ try {
   console.error('❌ Error initializing YouTube routes:', error.message);
 }
 
-// Routes
-app.use('/api/youtube', require('./routes/youtube-routes'));
-app.use('/api/logs', require('./routes/logs-routes'));
+try {
+  const logsRoutes = require('./routes/logs-routes');
+  app.use('/api/logs', logsRoutes);
+  console.log('✅ Logs routes initialized');
+} catch (error) {
+  console.error('❌ Error initializing logs routes:', error.message);
+}
 
 // Default route - serve index.html
 app.get('/', (req, res) => {
