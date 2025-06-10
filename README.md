@@ -1,6 +1,3 @@
-Here’s a visually engaging README file for your ViralCraft-AI project. You can copy and paste this into a new `README.md` file at the root of your repository, or use the provided shell script to generate it automatically.
-
----
 
 ## README.md Contents
 
