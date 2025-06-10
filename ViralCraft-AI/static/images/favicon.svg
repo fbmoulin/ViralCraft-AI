@@ -1,0 +1,13 @@
+/* Favicon para o ViralCraft-AI */
+/* Este é um arquivo SVG base64 embutido como texto */
+
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="32" height="32" rx="8" fill="url(#paint0_linear)"/>
+  <path d="M16 8L18.2 12.5L23 13.1L19.5 16.5L20.4 21.3L16 19L11.6 21.3L12.5 16.5L9 13.1L13.8 12.5L16 8Z" fill="white"/>
+  <defs>
+    <linearGradient id="paint0_linear" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3B82F6"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+  </defs>
+</svg>
