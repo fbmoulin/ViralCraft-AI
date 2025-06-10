@@ -84,55 +84,32 @@ const upload = multer({
 let sequelize;
 let Content;
 
-// Connect to Database (PostgreSQL or SQLite)
+// Connect to Database using the database service
 const connectDB = async () => {
-  let isSqlite = false;
-  
   try {
-    if (!process.env.DATABASE_URL) {
-      console.warn('⚠️ DATABASE_URL not set in environment variables. Running without database.');
+    console.log('📊 Initializing database connection...');
+    
+    // Use the database service
+    const databaseService = require('./services/database');
+    const connected = await databaseService.initialize();
+    
+    if (connected) {
+      console.log('✅ Database connected successfully');
+      
+      // Set global reference for routes
+      global.db = databaseService;
+      
+      return true;
+    } else {
+      console.warn('⚠️ Database connection failed, running in memory mode');
       return false;
     }
-
-    // Determine dialect from DATABASE_URL
-    isSqlite = process.env.DATABASE_URL.startsWith('sqlite:');
-    const isReplitPostgres = process.env.REPLIT_DB_ID && process.env.DATABASE_URL.includes('postgresql');
-
-    const options = {
-      logging: false
-    };
-
-    // Add dialect-specific options
-    if (isSqlite) {
-      options.dialect = 'sqlite';
-      console.log('📊 Using SQLite database');
-    } else {
-      options.dialect = 'postgres';
-
-      // Configure SSL for production PostgreSQL connections
-      if (!isReplitPostgres) {
-        options.dialectOptions = {
-          ssl: {
-            require: true,
-            rejectUnauthorized: false
-          }
-        };
-      }
-
-      // For Replit PostgreSQL, use connection pooling
-      if (isReplitPostgres) {
-        options.pool = {
-          max: 5,
-          min: 0,
-          idle: 10000
-        };
-      }
-
-      console.log('📊 Using PostgreSQL database');
-    }
-
-    try {
-      // Try to connect with a timeout
+  } catch (error) {
+    console.error('❌ Database connection error:', error.message);
+    console.warn('⚠️ Running without database');
+    return false;
+  }
+};
       sequelize = new Sequelize(process.env.DATABASE_URL, options);
 
       // Define Content model with database-specific types
