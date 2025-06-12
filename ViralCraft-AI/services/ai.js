@@ -23,6 +23,10 @@ class AIService {
 
   async initialize() {
     console.log('🤖 Initializing AI services...');
+    console.log('🔍 DEBUG: Environment check');
+    console.log('🔍 NODE_ENV:', process.env.NODE_ENV);
+    console.log('🔍 OpenAI key present:', !!process.env.OPENAI_API_KEY);
+    console.log('🔍 Anthropic key present:', !!process.env.ANTHROPIC_API_KEY);
 
     try {
       // Initialize OpenAI
@@ -57,6 +61,29 @@ class AIService {
       if (!this.openai && !this.anthropic) {
         console.log('🎭 No AI services configured, enabling fallback mode');
         this.fallbackMode = true;
+      }
+
+      // OpenAI Configuration
+      if (process.env.OPENAI_API_KEY) {
+        console.log('✅ OpenAI API key configured');
+        console.log('🔍 OpenAI key length:', process.env.OPENAI_API_KEY.length);
+      } else {
+        console.log('⚠️ OpenAI API key not configured');
+        console.log('💡 Tip: Add OPENAI_API_KEY to your environment variables');
+      }
+
+      // Anthropic Configuration  
+      if (process.env.ANTHROPIC_API_KEY) {
+        console.log('✅ Anthropic API key configured');
+        console.log('🔍 Anthropic key length:', process.env.ANTHROPIC_API_KEY.length);
+      } else {
+        console.log('⚠️ Anthropic API key not configured');
+        console.log('💡 Tip: Add ANTHROPIC_API_KEY to your environment variables');
+      }
+
+      if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
+        console.log('🎭 No AI services configured, enabling fallback mode');
+        console.log('📋 Available fallback features: mock responses, cached results');
       }
 
       this.initialized = true;

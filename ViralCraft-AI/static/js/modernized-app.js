@@ -808,4 +808,58 @@ document.addEventListener('DOMContentLoaded', function() {
 
     showNotification('Sugestão aplicada com sucesso!', 'success');
   };
+
+    // Debug functionality
+    window.debugApp = {
+        getInfo: async function() {
+            try {
+                const response = await fetch('/api/debug');
+                const data = await response.json();
+                console.log('🔍 Debug Info:', data);
+                return data;
+            } catch (error) {
+                console.error('❌ Debug error:', error);
+                return null;
+            }
+        },
+
+        testAI: async function() {
+            try {
+                const response = await fetch('/api/test-ai');
+                const data = await response.json();
+                console.log('🤖 AI Test Results:', data);
+                return data;
+            } catch (error) {
+                console.error('❌ AI test error:', error);
+                return null;
+            }
+        },
+
+        clearLogs: async function() {
+            try {
+                const response = await fetch('/api/clear-logs', { method: 'POST' });
+                const data = await response.json();
+                console.log('🧹 Logs cleared:', data);
+                return data;
+            } catch (error) {
+                console.error('❌ Clear logs error:', error);
+                return null;
+            }
+        }
+    };
+
+    // Add debug commands to console
+    console.log(`
+🔍 Debug Commands Available:
+- debugApp.getInfo() - Get system information
+- debugApp.testAI() - Test AI services
+- debugApp.clearLogs() - Clear application logs
+    `);
+
+    // Initialize app when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initApp);
+    } else {
+        initApp();
+    }
 });

@@ -185,7 +185,7 @@ app.get('/api/test-integration', async (req, res) => {
   try {
     const staticCssPath = path.join(__dirname, 'static', 'css', 'modernized-style.css');
     const staticJsPath = path.join(__dirname, 'static', 'js', 'modernized-app.js');
-    
+
     if (fs.existsSync(staticCssPath) && fs.existsSync(staticJsPath)) {
       tests.staticFiles = { status: 'ok', details: 'Static files accessible' };
     } else {
@@ -498,7 +498,7 @@ app.get('/api/errors/realtime', async (req, res) => {
   try {
     const healthData = getHealthData();
     const recentErrors = healthData.logs.lastErrors || [];
-    
+
     res.json({
       success: true,
       data: {
@@ -594,6 +594,15 @@ try {
   console.error('❌ Error initializing logs routes:', error.message);
 }
 
+//Registering debug routes
+try {
+  const debugRoutes = require('./routes/debug-routes');
+  app.use('/api', debugRoutes);
+  console.log('✅ Debug routes initialized');
+} catch (error) {
+  console.error('❌ Error initializing debug routes:', error.message);
+}
+
 // Default route - serve index.html
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -633,7 +642,7 @@ const logServerInfo = (port, dbConnected) => {
   const dbType = process.env.DATABASE_URL ? 
     (process.env.DATABASE_URL.startsWith('sqlite:') ? 'SQLite' : 'PostgreSQL') : 
     'SQLite';
-  
+
   console.log('\n🚀 Viral Content Creator Server Started Successfully');
   console.log(`📍 URL: http://0.0.0.0:${port}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
