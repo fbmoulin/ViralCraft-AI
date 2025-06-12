@@ -23,10 +23,16 @@ class AIService {
     console.log('🔍 DEBUG: Environment check');
     console.log('🔍 NODE_ENV:', process.env.NODE_ENV);
     console.log('🔍 OpenAI key present:', !!process.env.OPENAI_API_KEY);
+    console.log('🔍 OpenAI key length:', process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.length : 0);
+    console.log('🔍 OpenAI key starts with sk-:', process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.startsWith('sk-') : false);
 
     try {
       // Initialize OpenAI
-      if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here') {
+      if (process.env.OPENAI_API_KEY && 
+          process.env.OPENAI_API_KEY !== 'your_openai_api_key_here' &&
+          process.env.OPENAI_API_KEY.length > 20) {
+        
+        console.log('🔧 Creating OpenAI client...');
         this.openai = new OpenAI({
           apiKey: process.env.OPENAI_API_KEY,
           timeout: 30000, // 30 second timeout
@@ -34,47 +40,79 @@ class AIService {
         });
 
         // Test OpenAI connection
+        console.log('🧪 Testing OpenAI connection...');
         const testResult = await this.testOpenAI();
         if (testResult) {
           console.log('✅ OpenAI service initialized and tested successfully');
+          this.fallbackMode = false;
+          global.openai = this.openai; // Set global reference
         } else {
-          console.warn('⚠️ OpenAI service initialized but test failed');
+          console.warn('⚠️ OpenAI service initialized but test failed, enabling fallback');
+          this.fallbackMode = true;
         }
       } else {
-        console.warn('⚠️ OpenAI API key not configured');
+        console.warn('⚠️ OpenAI API key not configured or invalid');
+        console.log('💡 Expected format: sk-... with at least 20 characters');
         this.fallbackMode = true;
       }
 
       // Check if OpenAI service is available
-      if (!this.openai) {
-        console.log('🎭 OpenAI not configured, enabling fallback mode');
-        console.log('💡 Tip: Add OPENAI_API_KEY to your environment variables');
+      if (!this.openai || this.fallbackMode) {
+        console.log('🎭 OpenAI not available, enabling fallback mode');
+        console.log('💡 Tip: Set a valid OPENAI_API_KEY in your environment variables');
         console.log('📋 Available fallback features: mock responses, cached results');
         this.fallbackMode = true;
+        global.openai = null;
       }
 
       this.initialized = true;
-      return !!this.openai;
+      console.log(`🎯 AI Service Status: ${this.fallbackMode ? 'Fallback Mode' : 'OpenAI Active'}`);
+      return !!this.openai && !this.fallbackMode;
 
     } catch (error) {
+      console.error('❌ OpenAI service initialization failed:', error);
       logger.error('OpenAI service initialization failed', error);
       this.fallbackMode = true;
       this.initialized = true;
+      global.openai = null;
       return false;
     }
   }
 
   async testOpenAI() {
-    if (!this.openai) return false;
+    if (!this.openai) {
+      console.log('❌ OpenAI client not initialized');
+      return false;
+    }
 
     try {
-      await this.openai.chat.completions.create({
+      console.log('🔄 Testing OpenAI API connection...');
+      const response = await this.openai.chat.completions.create({
         model: "gpt-3.5-turbo",
         messages: [{ role: "user", content: "Test" }],
         max_tokens: 5
       });
+      
+      console.log('✅ OpenAI API test successful');
+      console.log(`📊 Model used: ${response.model}`);
+      console.log(`🎯 Tokens used: ${response.usage?.total_tokens || 0}`);
       return true;
     } catch (error) {
+      console.error('❌ OpenAI test failed:', error.message);
+      console.error('🔍 Error details:', {
+        status: error.status,
+        type: error.type,
+        code: error.code
+      });
+      
+      if (error.status === 401) {
+        console.error('🔑 Authentication failed - check your API key');
+      } else if (error.status === 429) {
+        console.error('⏱️ Rate limit exceeded - please wait');
+      } else if (error.status >= 500) {
+        console.error('🔧 OpenAI server error - try again later');
+      }
+      
       logger.warn('OpenAI test failed', error);
       return false;
     }

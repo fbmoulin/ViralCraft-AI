@@ -101,4 +101,43 @@ router.post('/clear-logs', (req, res) => {
   }
 });
 
+// Reinitialize AI service endpoint
+router.post('/reinit-ai', async (req, res) => {
+  try {
+    console.log('🔄 Manual AI service reinitialization requested');
+    const aiService = require('../services/ai');
+    
+    // Reset AI service state
+    aiService.openai = null;
+    aiService.initialized = false;
+    aiService.fallbackMode = false;
+    
+    // Reinitialize
+    const result = await aiService.initialize();
+    
+    logger.info('AI service reinitialization completed', { 
+      ip: req.ip, 
+      success: result,
+      fallbackMode: aiService.fallbackMode 
+    });
+    
+    res.json({ 
+      success: true, 
+      message: 'AI service reinitialized',
+      status: {
+        openaiWorking: result && !aiService.fallbackMode,
+        fallbackMode: aiService.fallbackMode,
+        initialized: aiService.initialized
+      }
+    });
+  } catch (error) {
+    logger.error('AI service reinitialization error', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to reinitialize AI service',
+      message: error.message 
+    });
+  }
+});
+
 module.exports = router;
