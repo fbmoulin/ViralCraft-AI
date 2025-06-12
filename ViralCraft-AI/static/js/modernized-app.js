@@ -39,6 +39,287 @@ document.addEventListener('DOMContentLoaded', function() {
   function showLoadingScreen() {
     if (loadingScreen) {
       loadingScreen.classList.remove('fade-out');
+      loadingScreen.style.display = 'flex';
+    }
+  }
+
+  function hideLoadingScreen() {
+    if (loadingScreen) {
+      loadingScreen.classList.add('fade-out');
+      setTimeout(() => {
+        loadingScreen.style.display = 'none';
+      }, 500);
+    }
+  }
+
+  // Verificar status do sistema
+  async function checkSystemStatus() {
+    try {
+      const response = await fetch('/api/health');
+      const data = await response.json();
+      
+      if (statusContainer) {
+        updateStatusDisplay(data);
+      }
+      
+      return data;
+    } catch (error) {
+      throw new Error('Failed to check system status');
+    }
+  }
+
+  function updateStatusDisplay(data) {
+    const uptimeElement = document.querySelector('.status-value[data-status="uptime"]');
+    if (uptimeElement) {
+      uptimeElement.textContent = data.uptime || '0s';
+    }
+
+    const aiElement = document.querySelector('.status-value[data-status="ai"]');
+    if (aiElement) {
+      const hasAI = data.services?.openai?.configured || data.services?.anthropic?.configured;
+      aiElement.innerHTML = hasAI ? 
+        '<span class="status-dot"></span> Ativo' : 
+        '<span class="status-dot" style="background-color: var(--color-error)"></span> Inativo';
+    }
+
+    const dbElement = document.querySelector('.status-value[data-status="database"]');
+    if (dbElement) {
+      const dbConnected = data.services?.database?.connected;
+      dbElement.innerHTML = dbConnected ? 
+        '<span class="status-dot"></span> Conectado' : 
+        '<span class="status-dot" style="background-color: var(--color-error)"></span> Desconectado';
+    }
+
+    const serverElement = document.querySelector('.status-value[data-status="server"]');
+    if (serverElement) {
+      serverElement.innerHTML = '<span class="status-dot"></span> Online';
+    }
+
+    showNotification('Status atualizado!', 'info');
+  }
+
+  // Inicializar abas
+  function initTabs() {
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    tabButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const targetTab = button.dataset.tab;
+        
+        // Remove active class from all tabs
+        tabButtons.forEach(btn => btn.classList.remove('active'));
+        tabContents.forEach(content => content.classList.remove('active'));
+        
+        // Add active class to clicked tab
+        button.classList.add('active');
+        const targetContent = document.getElementById(targetTab);
+        if (targetContent) {
+          targetContent.classList.add('active');
+        }
+      });
+    });
+  }
+
+  // Inicializar validação de formulário
+  function initFormValidation() {
+    const forms = document.querySelectorAll('form');
+    
+    forms.forEach(form => {
+      form.addEventListener('submit', validateForm);
+    });
+  }
+
+  function validateForm(event) {
+    const form = event.target;
+    const requiredFields = form.querySelectorAll('[required]');
+    let isValid = true;
+
+    requiredFields.forEach(field => {
+      if (!field.value.trim()) {
+        isValid = false;
+        field.classList.add('error');
+        showNotification(`Campo ${field.name || 'obrigatório'} não preenchido`, 'error');
+      } else {
+        field.classList.remove('error');
+      }
+    });
+
+    if (!isValid) {
+      event.preventDefault();
+    }
+  }
+
+  // Inicializar upload de arquivo
+  function initFileUpload() {
+    const fileInput = document.getElementById('file-input');
+    const dropZone = document.querySelector('.file-drop-zone');
+
+    if (fileInput && dropZone) {
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+      });
+
+      dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('dragover');
+      });
+
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+          fileInput.files = files;
+          handleFileUpload(files[0]);
+        }
+      });
+
+      fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+          handleFileUpload(e.target.files[0]);
+        }
+      });
+    }
+  }
+
+  function handleFileUpload(file) {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'text/plain'];
+    
+    if (!allowedTypes.includes(file.type)) {
+      showNotification('Tipo de arquivo não suportado', 'error');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) { // 10MB
+      showNotification('Arquivo muito grande (máximo 10MB)', 'error');
+      return;
+    }
+
+    showNotification(`Arquivo ${file.name} carregado com sucesso`, 'success');
+  }
+
+  // Configurar envio de formulário
+  function setupFormSubmission() {
+    const generateForm = document.getElementById('generate-form');
+    
+    if (generateForm) {
+      generateForm.addEventListener('submit', handleFormSubmission);
+    }
+  }
+
+  async function handleFormSubmission(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const formData = new FormData(form);
+    const submitButton = form.querySelector('button[type="submit"]');
+    
+    // Adicionar estado de loading
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.classList.add('loading');
+      submitButton.textContent = 'Gerando...';
+    }
+
+    try {
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        displayResults(data);
+        showNotification('Conteúdo gerado com sucesso!', 'success');
+      } else {
+        showNotification(data.error || 'Erro ao gerar conteúdo', 'error');
+      }
+    } catch (error) {
+      showNotification('Erro de conexão: ' + error.message, 'error');
+    } finally {
+      // Remover estado de loading
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.classList.remove('loading');
+        submitButton.textContent = 'Gerar Conteúdo';
+      }
+    }
+  }
+
+  function displayResults(data) {
+    if (resultContainer) {
+      resultContainer.innerHTML = `
+        <div class="result-content">
+          <h3>Conteúdo Gerado</h3>
+          <div class="content-output">
+            ${Object.entries(data.content).map(([platform, content]) => `
+              <div class="platform-content">
+                <h4>${platform.charAt(0).toUpperCase() + platform.slice(1)}</h4>
+                <div class="content-text">${content}</div>
+                <div class="content-actions">
+                  <button onclick="copyToClipboard('${content.replace(/'/g, "\\'")}')">Copiar</button>
+                  <button onclick="downloadContent('${content.replace(/'/g, "\\'")}')">Download</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+      resultContainer.style.display = 'block';
+    }
+  }
+
+  // Função de notificação
+  function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+      notification.classList.add('show');
+    }, 100);
+    
+    setTimeout(() => {
+      notification.classList.remove('show');
+      setTimeout(() => {
+        document.body.removeChild(notification);
+      }, 300);
+    }, 3000);
+  }
+
+  // Funções utilitárias globais
+  window.copyToClipboard = function(text) {
+    navigator.clipboard.writeText(text).then(() => {
+      showNotification('Conteúdo copiado!', 'success');
+    }).catch(() => {
+      // Fallback
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      showNotification('Conteúdo copiado!', 'success');
+    });
+  };
+
+  window.downloadContent = function(content) {
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `content-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+});out');
     }
   }
 
