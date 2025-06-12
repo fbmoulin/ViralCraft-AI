@@ -44,51 +44,17 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/static', express.static(path.join(__dirname, 'static')));
 
-// Initialize AI services with better error handling
+// Initialize AI services
+const aiService = require('./services/ai');
 
-// Error handling middleware (must be last)
-app.use(errorTracking);
-const initializeAIServices = () => {
-  console.log('🤖 Initializing AI services...');
-
-  // Initialize OpenAI
+const initializeAIServices = async () => {
   try {
-    if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here') {
-      const { OpenAI } = require('openai');
-      global.openai = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY
-      });
-      console.log('✅ OpenAI service initialized');
-    } else {
-      console.warn('⚠️ OpenAI API key not set (set OPENAI_API_KEY in environment)');
-      global.openai = null;
-    }
+    await aiService.initialize();
+    global.aiService = aiService;
+    console.log('✅ AI services integration completed');
   } catch (error) {
-    console.error('❌ Failed to initialize OpenAI:', error.message);
-    global.openai = null;
-  }
-
-  // Initialize Anthropic
-  try {
-    if (process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'your_anthropic_api_key_here') {
-      const { Anthropic } = require('@anthropic-ai/sdk');
-      global.anthropic = new Anthropic({
-        apiKey: process.env.ANTHROPIC_API_KEY
-      });
-      console.log('✅ Anthropic service initialized');
-    } else {
-      console.warn('⚠️ Anthropic API key not set (set ANTHROPIC_API_KEY in environment)');
-      global.anthropic = null;
-    }
-  } catch (error) {
-    console.error('❌ Failed to initialize Anthropic:', error.message);
-    global.anthropic = null;
-  }
-
-  // Enable demo mode if no AI services are available
-  if (!global.openai && !global.anthropic) {
-    console.log('🎭 No AI services configured, running in demo mode');
-    console.log('💡 Tip: Set OPENAI_API_KEY or ANTHROPIC_API_KEY for full functionality');
+    console.error('❌ AI services initialization failed:', error.message);
+    global.aiService = aiService; // Still set it for fallback mode
   }
 };
 
@@ -165,26 +131,31 @@ app.get('/api/test-integration', async (req, res) => {
     tests.database = { status: 'error', details: error.message };
   }
 
-  // Test OpenAI
+  // Test AI Service
   try {
-    if (global.openai) {
-      tests.openai = { status: 'ok', details: 'API key configured' };
+    if (global.aiService) {
+      const aiStatus = global.aiService.getStatus();
+      tests.aiService = { 
+        status: aiStatus.initialized ? 'ok' : 'error', 
+        details: `OpenAI: ${aiStatus.openai ? '✅' : '❌'}, Anthropic: ${aiStatus.anthropic ? '✅' : '❌'}, Fallback: ${aiStatus.fallbackMode ? 'enabled' : 'disabled'}` 
+      };
     } else {
-      tests.openai = { status: 'error', details: 'API key not configured' };
+      tests.aiService = { status: 'error', details: 'AI service not initialized' };
     }
   } catch (error) {
-    tests.openai = { status: 'error', details: error.message };
+    tests.aiService = { status: 'error', details: error.message };
   }
 
-  // Test Anthropic
+  // Test Performance Service
   try {
-    if (global.anthropic) {
-      tests.anthropic = { status: 'ok', details: 'API key configured' };
-    } else {
-      tests.anthropic = { status: 'error', details: 'API key not configured' };
-    }
+    const performanceService = require('./services/performanceService');
+    const healthChecks = await performanceService.runHealthChecks();
+    tests.performance = { 
+      status: 'ok', 
+      details: `Health: ${JSON.stringify(healthChecks)}` 
+    };
   } catch (error) {
-    tests.anthropic = { status: 'error', details: error.message };
+    tests.performance = { status: 'error', details: error.message };
   }
 
   // Test YouTube analyzer
@@ -341,89 +312,21 @@ app.post('/api/generate', async (req, res) => {
       suggestedContent
     } = req.body;
 
-    // Check if AI services are configured
-    if (!global.openai && !global.anthropic) {
-      return res.status(500).json({ 
-        error: 'AI services not configured. Configure OPENAI_API_KEY and/or ANTHROPIC_API_KEY in .env' 
-      });
-    }
+    // Generate content using AI service
+    const result = await global.aiService.generateContent({
+      topic,
+      contentType,
+      platform,
+      keywords,
+      tone,
+      extractedData,
+      additionalContext,
+      suggestedTitle,
+      suggestedContent
+    });
 
-    // Build prompt based on Soulclap template
-    const systemPrompt = `You are an expert in creating viral content following the Soulclap template.
-
-    MAIN GUIDELINES:
-    - Use irresistible hooks and magnetic headlines
-    - Apply the 80/20 principle (20% of insights generate 80% of value)
-    - Create emotional and connective content
-    - Use storytelling and practical examples
-    - Include strategic CTAs
-    - Optimize for SEO and engagement
-
-    SOULCLAP STRUCTURE:
-    1. Headline & Hook (curiosity, surprise or questioning)
-    2. Simplified Summary (2-3 lines with emojis)
-    3. Accessible Glossary 
-    4. Main text with didactic blocks
-    5. Practical examples and tools
-    6. Interactive quiz or poll
-    7. Varied and engaging CTA
-
-    Tone: ${tone || 'inspiring, accessible and transformative'}
-    Platform: ${platform}
-    Type: ${contentType}`;
-
-    const userPrompt = `
-    Topic: ${suggestedTitle || topic}
-    Keywords: ${keywords?.join(', ') || ''}
-    ${extractedData ? `\nExtracted data to use as basis:\n${extractedData}` : ''}
-    ${additionalContext ? `\nAdditional context:\n${additionalContext}` : ''}
-    ${suggestedContent ? `\nApproved content direction:\n${suggestedContent}` : ''}
-
-    Create complete content STRICTLY following the Soulclap template, 
-    including all elements for maximum engagement and viral potential.
-    ${suggestedTitle ? `Use the approved title: "${suggestedTitle}"` : ''}
-    ${suggestedContent ? 'Expand on the approved content direction while maintaining its essence.' : ''}`;
-
-    let generatedContent = '';
-    let adaptedContent = {};
-
-    // Generate content using available APIs
-    if (global.anthropic) {
-      // Use Claude for main content generation
-      const response = await global.anthropic.messages.create({
-        model: "claude-3-sonnet-20240229",
-        messages: [
-          { role: "user", content: `${systemPrompt}\n\n${userPrompt}` }
-        ],
-        max_tokens: 4000
-      });
-
-      generatedContent = response.content[0].text;
-    } else if (global.openai) {
-      // Fallback to OpenAI if Anthropic is not available
-      const response = await global.openai.chat.completions.create({
-        model: "gpt-4",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        max_tokens: 3000
-      });
-
-      generatedContent = response.choices[0].message.content;
-    } else {
-      // Simulated content if no API is configured
-      generatedContent = `# Example Viral Content Generated for ${platform}
-
-**Headline:** ${topic}
-
-**Summary:** This is a sample content generated by Soulclap Content Creator ✨
-
-Configure your API keys to get real AI-generated content!`;
-    }
-
-    // Adapt content for multiple platforms if requested
-    adaptedContent[platform] = generatedContent;
+    const adaptedContent = {};
+    adaptedContent[platform] = result.content;
 
     // Save to database (if connected)
     try {

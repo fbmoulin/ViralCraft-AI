@@ -123,7 +123,7 @@ class DatabaseService {
           return typeof value === 'string' ? JSON.parse(value) : value;
         },
         set(value) {
-          this.setDataValue('content', isSqlite ? JSON.stringify(value) : value;
+          this.setDataValue('content', isSqlite ? JSON.stringify(value) : value);
         }
       },
       keywords: {
@@ -134,7 +134,7 @@ class DatabaseService {
           return typeof value === 'string' ? JSON.parse(value) : value;
         },
         set(value) {
-          this.setDataValue('keywords', isSqlite ? JSON.stringify(value) : value;
+          this.setDataValue('keywords', isSqlite ? JSON.stringify(value) : value);
         }
       },
       metadata: {
@@ -145,7 +145,7 @@ class DatabaseService {
           return typeof value === 'string' ? JSON.parse(value) : value;
         },
         set(value) {
-          this.setDataValue('metadata', isSqlite ? JSON.stringify(value) : value;
+          this.setDataValue('metadata', isSqlite ? JSON.stringify(value) : value);
         }
       },
       viralScore: {

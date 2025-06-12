@@ -148,6 +148,50 @@ class PerformanceService {
     this.aiResponseTimes = [];
     this.startTime = Date.now();
   }
+
+  getServiceHealth() {
+    return {
+      database: global.db ? (global.db.isConnected ? 'healthy' : 'disconnected') : 'not_configured',
+      ai: global.aiService ? (global.aiService.fallbackMode ? 'fallback' : 'healthy') : 'not_configured',
+      cache: 'healthy',
+      overall: this.getHealthStatus()
+    };
+  }
+
+  async runHealthChecks() {
+    const checks = {};
+    
+    // Database health
+    if (global.db && global.db.isConnected) {
+      try {
+        await global.db.healthCheck();
+        checks.database = { status: 'healthy', latency: 0 };
+      } catch (error) {
+        checks.database = { status: 'unhealthy', error: error.message };
+      }
+    } else {
+      checks.database = { status: 'disconnected' };
+    }
+    
+    // AI service health
+    if (global.aiService) {
+      checks.ai = {
+        status: global.aiService.fallbackMode ? 'fallback' : 'healthy',
+        providers: global.aiService.getStatus()
+      };
+    } else {
+      checks.ai = { status: 'not_configured' };
+    }
+    
+    // Memory health
+    const memUsage = process.memoryUsage();
+    checks.memory = {
+      status: memUsage.heapUsed > 1024 * 1024 * 1024 ? 'warning' : 'healthy', // 1GB threshold
+      usage: Math.round(memUsage.heapUsed / 1024 / 1024) + 'MB'
+    };
+    
+    return checks;
+  }
 }
 
 module.exports = new PerformanceService();
