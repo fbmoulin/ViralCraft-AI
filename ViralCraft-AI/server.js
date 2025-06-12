@@ -632,7 +632,7 @@ const logServerInfo = (port, dbConnected) => {
     (process.env.DATABASE_URL.startsWith('sqlite:') ? 'SQLite' : 'PostgreSQL') : 
     'SQLite';
   
-  console.log('\n🚀 ViralCraft-AI Server Started Successfully');
+  console.log('\n🚀 Viral Content Creator Server Started Successfully');
   console.log(`📍 URL: http://0.0.0.0:${port}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`📊 Database: ${dbType} ${dbConnected ? '✅' : '❌'}`);
