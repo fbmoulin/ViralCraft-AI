@@ -492,10 +492,29 @@ app.post('/api/suggest', async (req, res) => {
       additionalContext 
     } = req.body;
 
-    // Check if AI services are configured
-    if (!global.openai && !global.anthropic) {
-      return res.status(500).json({ 
-        error: 'AI services not configured. Configure OPENAI_API_KEY and/or ANTHROPIC_API_KEY in .env' 
+    // Use AI service for content generation
+    try {
+      const result = await aiService.generateContent({
+        topic,
+        contentType: type,
+        platform,
+        tone,
+        keywords,
+        extractedData,
+        additionalContext
+      });
+
+      return res.json({
+        content: result.content,
+        provider: result.provider,
+        model: result.model,
+        tokensUsed: result.tokensUsed || 0
+      });
+    } catch (error) {
+      logger.error('Content generation failed:', error);
+      return res.status(500).json({
+        error: 'Error generating content',
+        details: error.message
       });
     }
 
@@ -520,13 +539,41 @@ app.post('/api/suggest', async (req, res) => {
 
     let suggestion = {};
 
-    // Generate suggestion using available APIs
-    if (global.anthropic) {
-      // Use Claude for suggestion
-      const response = await global.anthropic.messages.create({
-        model: "claude-3-haiku-20240307",
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
+    // Generate suggestion using AI service
+    try {
+      const result = await aiService.generateContent({
+        topic,
+        contentType,
+        platform,
+        tone,
+        keywords,
+        extractedData,
+        additionalContext
+      });
+
+      // Parse the suggestion from the generated content
+      const lines = result.content.split('\n');
+      suggestion = {
+        title: lines.find(line => line.includes('Título') || line.includes('Title'))?.replace(/.*[:：]/, '').trim() || topic,
+        outline: lines.filter(line => line.includes('•') || line.includes('-') || line.includes('1.')).slice(0, 5),
+        hook: lines.find(line => line.includes('Hook') || line.includes('Abertura'))?.replace(/.*[:：]/, '').trim() || `Descubra os segredos de ${topic}`,
+        provider: result.provider
+      };
+    } catch (error) {
+      logger.error('Suggestion generation failed:', error);
+      // Fallback suggestion
+      suggestion = {
+        title: `${topic} - Guia Completo`,
+        outline: [
+          `• Introdução ao ${topic}`,
+          `• Principais benefícios`,
+          `• Como implementar`,
+          `• Dicas práticas`,
+          `• Próximos passos`
+        ],
+        hook: `Você não vai acreditar no que descobrimos sobre ${topic}!`,
+        provider: 'fallback'
+      };rompt }],
         max_tokens: 1000
       });
 

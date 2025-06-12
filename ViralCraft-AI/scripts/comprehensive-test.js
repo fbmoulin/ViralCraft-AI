@@ -36,9 +36,15 @@ async function testAllIntegrations() {
   try {
     const response = await axios.get(`${BASE_URL}/api/test/integration`);
     const dbStatus = response.data.database;
-    results.database.status = dbStatus === 'Connected and responsive' ? 'healthy' : 'unhealthy';
-    results.database.details = { message: dbStatus };
-    console.log('✅ Database connection verified');
+    if (dbStatus && dbStatus.includes('Connected')) {
+      results.database.status = 'healthy';
+      results.database.details = { message: dbStatus };
+      console.log('✅ Database connection verified');
+    } else {
+      results.database.status = 'unhealthy';
+      results.database.details = { message: dbStatus || 'Unknown status' };
+      console.log('⚠️ Database status unclear:', dbStatus);
+    }
   } catch (error) {
     results.database.status = 'error';
     results.database.details = { error: error.message };

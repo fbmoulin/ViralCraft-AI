@@ -66,6 +66,7 @@ class AIService {
       // Make services globally available for backwards compatibility
       global.openai = this.openai;
       global.anthropic = this.anthropic;
+      global.aiService = this;
 
       // OpenAI Configuration
       if (process.env.OPENAI_API_KEY) {

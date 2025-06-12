@@ -14,15 +14,15 @@ const { body, param, validationResult } = require('express-validator');
 router.get('/', async (req, res, next) => {
   try {
     const { platform, status, limit = 20, offset = 0 } = req.query;
-    
+
     // Construir filtros baseados nos parâmetros
     const filters = {};
     if (platform) filters.platform = platform;
     if (status) filters.status = status;
-    
+
     // Opções de paginação
     const options = { limit: parseInt(limit), offset: parseInt(offset) };
-    
+
     const contents = await contentRepository.findAll(filters, options);
     res.json({ 
       success: true, 
@@ -51,13 +51,13 @@ router.get('/:id',
           errors: errors.array() 
         });
       }
-      
+
       const content = await contentRepository.findById(req.params.id);
-      
+
       if (!content) {
         return next(ErrorHandler.createError('Conteúdo não encontrado', 404));
       }
-      
+
       res.json({ success: true, data: content });
     } catch (error) {
       next(error);
@@ -86,13 +86,13 @@ router.post('/',
           errors: errors.array() 
         });
       }
-      
+
       // Analisar conteúdo antes de salvar
       const analysis = textAnalysisService.analyzeContent(
         typeof req.body.content === 'string' ? req.body.content : JSON.stringify(req.body.content),
         req.body.platform
       );
-      
+
       // Adicionar metadados da análise
       const contentData = {
         ...req.body,
@@ -102,7 +102,7 @@ router.post('/',
         },
         viralScore: analysis.viralScore
       };
-      
+
       const newContent = await contentRepository.create(contentData);
       res.status(201).json({ 
         success: true, 
@@ -134,16 +134,16 @@ router.put('/:id',
           errors: errors.array() 
         });
       }
-      
+
       // Se o conteúdo foi atualizado, reanalisar
       let updates = req.body;
-      
+
       if (req.body.content && req.body.platform) {
         const analysis = textAnalysisService.analyzeContent(
           typeof req.body.content === 'string' ? req.body.content : JSON.stringify(req.body.content),
           req.body.platform
         );
-        
+
         updates = {
           ...updates,
           metadata: {
@@ -153,13 +153,13 @@ router.put('/:id',
           viralScore: analysis.viralScore
         };
       }
-      
+
       const updatedContent = await contentRepository.update(req.params.id, updates);
-      
+
       if (!updatedContent) {
         return next(ErrorHandler.createError('Conteúdo não encontrado', 404));
       }
-      
+
       res.json({ success: true, data: updatedContent });
     } catch (error) {
       next(error);
@@ -184,13 +184,13 @@ router.delete('/:id',
           errors: errors.array() 
         });
       }
-      
+
       const deleted = await contentRepository.delete(req.params.id);
-      
+
       if (!deleted) {
         return next(ErrorHandler.createError('Conteúdo não encontrado', 404));
       }
-      
+
       res.json({ 
         success: true, 
         message: 'Conteúdo removido com sucesso' 
@@ -247,20 +247,20 @@ router.post('/:id/analyze',
   async (req, res, next) => {
     try {
       const content = await contentRepository.findById(req.params.id);
-      
+
       if (!content) {
         return next(ErrorHandler.createError('Conteúdo não encontrado', 404));
       }
-      
+
       const contentText = typeof content.content === 'string' 
         ? content.content 
         : JSON.stringify(content.content);
-      
+
       const analysis = textAnalysisService.analyzeContent(
         contentText,
         content.platform
       );
-      
+
       // Atualizar metadados com a nova análise
       await contentRepository.update(req.params.id, {
         metadata: {
@@ -269,7 +269,7 @@ router.post('/:id/analyze',
         },
         viralScore: analysis.viralScore
       });
-      
+
       res.json({ 
         success: true, 
         data: analysis 
