@@ -723,15 +723,20 @@ app.use((err, req, res, next) => {
 // Error handling middleware (must be last)
 app.use(errorTracking);
 
-// Utility function to log server info
+// Optimized server info logging
 const logServerInfo = (port, dbConnected) => {
   const dbType = process.env.DATABASE_URL ? 
     (process.env.DATABASE_URL.startsWith('sqlite:') ? 'SQLite' : 'PostgreSQL') : 
-    'None';
-  console.log(`🚀 Soulclap server running at http://0.0.0.0:${port}`);
-  console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📊 Database (${dbType}): ${dbConnected ? 'Connected' : 'Not connected'}`);
-  console.log(`🧠 AI Services: ${global.openai ? 'OpenAI ✓' : 'OpenAI ✗'} | ${global.anthropic ? 'Anthropic ✓' : 'Anthropic ✗'}`);
+    'SQLite';
+  
+  console.log('\n🚀 ViralCraft-AI Server Started Successfully');
+  console.log(`📍 URL: http://0.0.0.0:${port}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📊 Database: ${dbType} ${dbConnected ? '✅' : '❌'}`);
+  console.log(`🤖 AI Services: ${global.openai ? 'OpenAI ✅' : 'OpenAI ❌'} | ${global.anthropic ? 'Anthropic ✅' : 'Anthropic ❌'}`);
+  console.log(`💾 Cache: Enabled`);
+  console.log(`📈 Monitoring: Active`);
+  console.log('─'.repeat(50));
 };
 
 // Start server

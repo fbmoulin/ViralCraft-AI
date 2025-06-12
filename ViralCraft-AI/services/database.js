@@ -1,4 +1,3 @@
-
 const { Sequelize, DataTypes } = require('sequelize');
 const config = require('../config/app');
 
@@ -15,7 +14,7 @@ class DatabaseService {
     try {
       // Determine database type
       const isSqlite = config.database.url.startsWith('sqlite:');
-      
+
       const options = {
         ...config.database.options,
         dialect: isSqlite ? 'sqlite' : 'postgres',
@@ -52,19 +51,19 @@ class DatabaseService {
 
       // Sync database
       await this.sequelize.sync({ alter: true });
-      
+
       this.isConnected = true;
       return true;
 
     } catch (error) {
       console.error('❌ Database connection failed:', error.message);
-      
+
       // Fallback to SQLite
       if (!config.database.url.startsWith('sqlite:')) {
         console.log('🔄 Falling back to SQLite...');
         return this.initializeSQLiteFallback();
       }
-      
+
       this.isConnected = false;
       return false;
     }
@@ -81,7 +80,7 @@ class DatabaseService {
       await this.sequelize.authenticate();
       this.defineModels(true);
       await this.sequelize.sync({ alter: true });
-      
+
       console.log('✅ SQLite fallback initialized');
       this.isConnected = true;
       return true;
@@ -124,7 +123,7 @@ class DatabaseService {
           return typeof value === 'string' ? JSON.parse(value) : value;
         },
         set(value) {
-          this.setDataValue('content', isSqlite ? JSON.stringify(value) : value);
+          this.setDataValue('content', isSqlite ? JSON.stringify(value) : value;
         }
       },
       keywords: {
@@ -135,7 +134,7 @@ class DatabaseService {
           return typeof value === 'string' ? JSON.parse(value) : value;
         },
         set(value) {
-          this.setDataValue('keywords', isSqlite ? JSON.stringify(value) : value);
+          this.setDataValue('keywords', isSqlite ? JSON.stringify(value) : value;
         }
       },
       metadata: {
@@ -146,7 +145,7 @@ class DatabaseService {
           return typeof value === 'string' ? JSON.parse(value) : value;
         },
         set(value) {
-          this.setDataValue('metadata', isSqlite ? JSON.stringify(value) : value);
+          this.setDataValue('metadata', isSqlite ? JSON.stringify(value) : value;
         }
       },
       viralScore: {
@@ -353,7 +352,7 @@ class DatabaseService {
     try {
       await this.sequelize.authenticate();
       const contentCount = await this.models.Content.count();
-      
+
       return {
         status: 'connected',
         type: this.sequelize.getDialect(),
