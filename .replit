@@ -5,7 +5,7 @@ run = "node index.js"
 channel = "stable-24_05"
 
 [deployment]
-run = ["sh", "-c", "node index.js"]
+run = ["sh", "-c", "cd ViralCraft-AI && npm start"]
 
 [workflows]
 runButton = "Start Server"
