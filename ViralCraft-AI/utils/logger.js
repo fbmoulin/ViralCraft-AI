@@ -11,6 +11,17 @@ if (!fs.existsSync(logsDir)) {
 }
 
 // Configure winston logger
+const winston = require('winston');
+const DailyRotateFile = require('winston-daily-rotate-file');
+const path = require('path');
+const fs = require('fs');
+
+// Ensure logs directory exists
+const logsDir = path.join(__dirname, '../logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
+
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
   format: winston.format.combine(
@@ -105,6 +116,7 @@ class LogMonitor {
     this.lastErrors = [];
     this.startTime = Date.now();
   }
+  }
 }
 
 const monitor = new LogMonitor();
@@ -141,4 +153,4 @@ const enhancedLogger = {
   resetStats: () => monitor.reset()
 };
 
-module.exports = enhancedLogger;
+module.exports = enhancedLogger;er;

@@ -45,6 +45,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/static', express.static(path.join(__dirname, 'static')));
 
 // Initialize AI services with better error handling
+
+// Error handling middleware (must be last)
+app.use(errorTracking);
 const initializeAIServices = () => {
   console.log('🤖 Initializing AI services...');
 
@@ -694,6 +697,8 @@ app.use((req, res, next) => {
     } else {
       console.log(`✅ ${log}`);
     }
+  });
+  next();
   });
   next();
 });

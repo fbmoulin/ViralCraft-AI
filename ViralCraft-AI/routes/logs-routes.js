@@ -1,8 +1,3 @@
-
-const express = require('express');
-const router = express.Router();
-const logger = require('../utils/logger');
-const fs = require('fs');
 const express = require('express');
 const router = express.Router();
 const path = require('path');
@@ -31,7 +26,7 @@ router.get('/errors', (req, res) => {
   try {
     const stats = logger.getStats();
     const recentErrors = stats.lastErrors || [];
-    
+
     res.json({
       success: true,
       data: {
@@ -53,14 +48,14 @@ router.get('/errors', (req, res) => {
 router.get('/files', (req, res) => {
   try {
     const logsDir = path.join(__dirname, '../logs');
-    
+
     if (!fs.existsSync(logsDir)) {
       return res.json({
         success: true,
         files: []
       });
     }
-    
+
     const files = fs.readdirSync(logsDir)
       .filter(file => file.endsWith('.log'))
       .map(file => {
@@ -74,7 +69,7 @@ router.get('/files', (req, res) => {
         };
       })
       .sort((a, b) => new Date(b.modified) - new Date(a.modified));
-    
+
     res.json({
       success: true,
       files
