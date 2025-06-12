@@ -152,7 +152,7 @@ app.get('/api/test-integration', async (req, res) => {
       const aiStatus = global.aiService.getStatus();
       tests.aiService = { 
         status: aiStatus.initialized ? 'ok' : 'error', 
-        details: `OpenAI: ${aiStatus.openai ? '✅' : '❌'}, Anthropic: ${aiStatus.anthropic ? '✅' : '❌'}, Fallback: ${aiStatus.fallbackMode ? 'enabled' : 'disabled'}` 
+        details: `OpenAI: ${aiStatus.openai ? '✅' : '❌'}, Fallback: ${aiStatus.fallbackMode ? 'enabled' : 'disabled'}` 
       };
     } else {
       tests.aiService = { status: 'error', details: 'AI service not initialized' };
@@ -240,10 +240,6 @@ app.get('/api/health', apiCache(30000), async (req, res) => { // Cache for 30 se
         openai: {
           configured: !!global.openai,
           key: global.openai ? 'valid' : 'missing'
-        },
-        anthropic: {
-          configured: !!global.anthropic,
-          key: global.anthropic ? 'valid' : 'missing'
         }
       },
       monitoring: {

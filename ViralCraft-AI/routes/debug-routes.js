@@ -53,10 +53,6 @@ router.get('/test-ai', async (req, res) => {
         configured: !!process.env.OPENAI_API_KEY,
         status: 'not_tested'
       },
-      anthropic: {
-        configured: !!process.env.ANTHROPIC_API_KEY,
-        status: 'not_tested'
-      },
       fallback: {
         available: true,
         status: 'ready'
@@ -66,25 +62,15 @@ router.get('/test-ai', async (req, res) => {
     // Test OpenAI if configured
     if (process.env.OPENAI_API_KEY) {
       try {
-        // This would test the actual API - for now just mark as configured
-        testResults.openai.status = 'configured';
-        logger.info('OpenAI service test - configured');
+        // Test actual OpenAI connection
+        const aiService = require('../services/ai');
+        const openaiWorking = await aiService.testOpenAI();
+        testResults.openai.status = openaiWorking ? 'working' : 'configured_but_failed';
+        logger.info(`OpenAI service test - ${testResults.openai.status}`);
       } catch (error) {
         testResults.openai.status = 'error';
         testResults.openai.error = error.message;
         logger.error('OpenAI service test failed', error);
-      }
-    }
-
-    // Test Anthropic if configured
-    if (process.env.ANTHROPIC_API_KEY) {
-      try {
-        testResults.anthropic.status = 'configured';
-        logger.info('Anthropic service test - configured');
-      } catch (error) {
-        testResults.anthropic.status = 'error';
-        testResults.anthropic.error = error.message;
-        logger.error('Anthropic service test failed', error);
       }
     }
 
