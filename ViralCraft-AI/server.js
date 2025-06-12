@@ -59,7 +59,7 @@ app.use(express.static(path.join(__dirname, 'public'), staticOptions));
 app.use('/static', express.static(path.join(__dirname, 'static'), staticOptions));
 
 // Initialize AI services and middleware
-const aiService = require('./services/ai');
+const aiService = require('./services/enhancedAI');
 const apiCache = require('./middleware/apiCache');
 
 const initializeAIServices = async () => {
@@ -95,30 +95,132 @@ const upload = multer({
 let sequelize;
 let Content;
 
-// Connect to Database using the database service
-const connectDB = async () => {
+// Initialize Integration Manager with all services
+const integrationManager = require('./services/integrationManager');
+const databaseService = require('./services/database');
+const lightDatabaseService = require('./services/lightDatabase');
+const cacheService = require('./services/cacheService');
+const performanceService = require('./services/performanceService');
+
+const initializeServices = async () => {
   try {
-    console.log('📊 Initializing database connection...');
+    console.log('🔧 Initializing all services with Integration Manager...');
 
-    // Use the database service
-    const databaseService = require('./services/database');
-    const connected = await databaseService.initialize();
+    // Register Database Service
+    integrationManager.registerService('database', databaseService, {
+      healthCheck: async () => {
+        if (!databaseService.isConnected) throw new Error('Database not connected');
+        return await databaseService.healthCheck();
+      },
+      retryPolicy: { maxRetries: 3, backoffMs: 2000 },
+      circuitBreaker: { threshold: 3, resetTimeMs: 60000 },
+      fallback: async (...args) => {
+        console.log('🔄 Falling back to light database...');
+        if (!lightDatabaseService.isConnected) {
+          await lightDatabaseService.initialize();
+        }
+        return lightDatabaseService;
+      },
+      critical: false,
+      timeout: 15000
+    });
 
-    if (connected) {
-      console.log('✅ Database connected successfully');
+    // Register Light Database Service
+    integrationManager.registerService('lightDatabase', lightDatabaseService, {
+      healthCheck: async () => {
+        if (!lightDatabaseService.isConnected) throw new Error('Light database not connected');
+        return await lightDatabaseService.getStats();
+      },
+      retryPolicy: { maxRetries: 2, backoffMs: 1000 },
+      circuitBreaker: { threshold: 5, resetTimeMs: 30000 },
+      critical: false,
+      timeout: 10000
+    });
 
-      // Set global reference for routes
-      global.db = databaseService;
+    // Register AI Service
+    integrationManager.registerService('ai', aiService, {
+      healthCheck: async () => {
+        const status = aiService.getStatus();
+        if (!status.initialized) throw new Error('AI service not initialized');
+        return status;
+      },
+      retryPolicy: { maxRetries: 2, backoffMs: 3000 },
+      circuitBreaker: { threshold: 5, resetTimeMs: 120000 },
+      fallback: async (params) => {
+        console.log('🔄 Using AI service fallback mode...');
+        return aiService.generateWithFallback(params);
+      },
+      critical: false,
+      timeout: 45000
+    });
+
+    // Register Cache Service
+    integrationManager.registerService('cache', cacheService, {
+      healthCheck: async () => {
+        return cacheService.isHealthy();
+      },
+      retryPolicy: { maxRetries: 1, backoffMs: 500 },
+      circuitBreaker: { threshold: 10, resetTimeMs: 30000 },
+      fallback: async () => {
+        console.log('🔄 Cache service unavailable, proceeding without cache...');
+        return null;
+      },
+      critical: false,
+      timeout: 5000
+    });
+
+    // Register Performance Service
+    integrationManager.registerService('performance', performanceService, {
+      healthCheck: async () => {
+        return await performanceService.runHealthChecks();
+      },
+      retryPolicy: { maxRetries: 1, backoffMs: 1000 },
+      circuitBreaker: { threshold: 5, resetTimeMs: 60000 },
+      critical: false,
+      timeout: 10000
+    });
+
+    // Initialize all services
+    await integrationManager.initialize();
+
+    // Set global references with resilient wrappers
+    global.db = integrationManager.getService('database');
+    global.lightDb = integrationManager.getService('lightDatabase');
+    global.aiService = integrationManager.getService('ai');
+    global.cacheService = integrationManager.getService('cache');
+    global.performanceService = integrationManager.getService('performance');
+    global.integrationManager = integrationManager;
+
+    console.log('✅ All services initialized with Integration Manager');
+    return true;
+
+  } catch (error) {
+    console.error('❌ Service initialization failed:', error.message);
+    
+    // Try to initialize critical services individually
+    try {
+      console.log('🔄 Attempting fallback initialization...');
+      
+      // Initialize at least light database for basic functionality
+      if (!lightDatabaseService.isConnected) {
+        await lightDatabaseService.initialize();
+        global.db = lightDatabaseService;
+        console.log('✅ Fallback to light database successful');
+      }
+
+      // Initialize AI service in fallback mode
+      if (!global.aiService) {
+        await aiService.initialize();
+        global.aiService = aiService;
+        console.log('✅ AI service initialized in fallback mode');
+      }
 
       return true;
-    } else {
-      console.warn('⚠️ Database connection failed, running in memory mode');
+    } catch (fallbackError) {
+      console.error('❌ Fallback initialization also failed:', fallbackError.message);
+      console.warn('⚠️ Running in minimal mode without database and AI services');
       return false;
     }
-  } catch (error) {
-    console.error('❌ Database connection error:', error.message);
-    console.warn('⚠️ Running without database');
-    return false;
   }
 };
 
@@ -603,6 +705,15 @@ try {
   console.error('❌ Error initializing debug routes:', error.message);
 }
 
+// Register health check routes
+try {
+  const healthRoutes = require('./routes/healthcheck-routes');
+  app.use('/api', healthRoutes);
+  console.log('✅ Health check routes initialized');
+} catch (error) {
+  console.error('❌ Error initializing health check routes:', error.message);
+}
+
 // Default route - serve index.html
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -658,13 +769,15 @@ const startServer = async () => {
   try {
     // Always use PORT from env or default to 5000 instead of 3000 (which is often in use)
     const port = process.env.PORT || 5000;
-    // Connect to database
-    const dbConnected = await connectDB();
+    
+    // Initialize all services
+    const servicesInitialized = await initializeServices();
+    
     // Attempt to start server
     const startServerOnPort = (portToUse) => {
       return new Promise((resolve, reject) => {
         const server = app.listen(portToUse, '0.0.0.0', () => {
-          logServerInfo(portToUse, dbConnected);
+          logServerInfo(portToUse, servicesInitialized);
           resolve(server);
         }).on('error', (err) => {
           if (err.code === 'EADDRINUSE') {
@@ -679,7 +792,34 @@ const startServer = async () => {
         });
       });
     };
-    await startServerOnPort(port);
+
+    const server = await startServerOnPort(port);
+
+    // Graceful shutdown handling
+    const gracefulShutdown = async (signal) => {
+      console.log(`\n🔄 Received ${signal}. Starting graceful shutdown...`);
+      
+      server.close(async () => {
+        console.log('🔌 HTTP server closed');
+        
+        if (global.integrationManager) {
+          await global.integrationManager.shutdown();
+        }
+        
+        console.log('✅ Graceful shutdown complete');
+        process.exit(0);
+      });
+      
+      // Force shutdown after 30 seconds
+      setTimeout(() => {
+        console.log('⚠️ Forcing shutdown after timeout');
+        process.exit(1);
+      }, 30000);
+    };
+
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
   } catch (error) {
     console.error('Fatal error starting server:', error);
     console.error(error.stack);
