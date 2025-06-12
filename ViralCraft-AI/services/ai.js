@@ -4,28 +4,32 @@
  */
 
 const { OpenAI } = require('openai');
+const { Anthropic } = require('@anthropic-ai/sdk');
 const logger = require('../utils/logger');
 const performanceService = require('./performanceService');
 
 class AIService {
   constructor() {
     this.openai = null;
+    this.anthropic = null;
     this.initialized = false;
     this.fallbackMode = false;
     this.requestQueue = [];
     this.rateLimits = {
-      openai: { requests: 0, resetTime: 0 }
+      openai: { requests: 0, resetTime: 0 },
+      anthropic: { requests: 0, resetTime: 0 }
     };
   }
 
   async initialize() {
-    console.log('🤖 Initializing OpenAI service...');
+    console.log('🤖 Initializing AI services...');
     console.log('🔍 DEBUG: Environment check');
     console.log('🔍 NODE_ENV:', process.env.NODE_ENV);
     console.log('🔍 OpenAI key present:', !!process.env.OPENAI_API_KEY);
+    console.log('🔍 Anthropic key present:', !!process.env.ANTHROPIC_API_KEY);
 
     try {
-      // Initialize OpenAI only
+      // Initialize OpenAI
       if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here') {
         this.openai = new OpenAI({
           apiKey: process.env.OPENAI_API_KEY,
@@ -38,19 +42,26 @@ class AIService {
         console.log('✅ OpenAI service initialized and tested');
       } else {
         console.warn('⚠️ OpenAI API key not configured');
-        this.fallbackMode = true;
       }
 
-      // Check if OpenAI service is available
-      if (!this.openai) {
-        console.log('🎭 OpenAI not configured, enabling fallback mode');
-        this.fallbackMode = true;
+      // Initialize Anthropic
+      if (process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'your_anthropic_api_key_here') {
+        this.anthropic = new Anthropic({
+          apiKey: process.env.ANTHROPIC_API_KEY,
+          timeout: 30000,
+          maxRetries: 3
+        });
+
+        console.log('✅ Anthropic service initialized');
+      } else {
+        console.warn('⚠️ Anthropic API key not configured');
       }
 
-      // Make services globally available for backwards compatibility
-      global.openai = this.openai;
-      global.anthropic = null; // Disable Anthropic
-      global.aiService = this;
+      // Check if any AI service is available
+      if (!this.openai && !this.anthropic) {
+        console.log('🎭 No AI services configured, enabling fallback mode');
+        this.fallbackMode = true;
+      }
 
       // OpenAI Configuration
       if (process.env.OPENAI_API_KEY) {
@@ -59,7 +70,19 @@ class AIService {
       } else {
         console.log('⚠️ OpenAI API key not configured');
         console.log('💡 Tip: Add OPENAI_API_KEY to your environment variables');
-        console.log('🎭 Running in fallback mode');
+      }
+
+      // Anthropic Configuration  
+      if (process.env.ANTHROPIC_API_KEY) {
+        console.log('✅ Anthropic API key configured');
+        console.log('🔍 Anthropic key length:', process.env.ANTHROPIC_API_KEY.length);
+      } else {
+        console.log('⚠️ Anthropic API key not configured');
+        console.log('💡 Tip: Add ANTHROPIC_API_KEY to your environment variables');
+      }
+
+      if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
+        console.log('🎭 No AI services configured, enabling fallback mode');
         console.log('📋 Available fallback features: mock responses, cached results');
       }
 
@@ -67,7 +90,7 @@ class AIService {
       return true;
 
     } catch (error) {
-      logger.error('OpenAI service initialization failed', error);
+      logger.error('AI service initialization failed', error);
       this.fallbackMode = true;
       this.initialized = true;
       return false;
@@ -98,7 +121,19 @@ class AIService {
         return this.generateFallbackContent(params);
       }
 
-      // Use OpenAI only
+      // Try Anthropic first (usually more reliable)
+      if (this.anthropic && this.isServiceAvailable('anthropic')) {
+        try {
+          const result = await this.generateWithAnthropic(params);
+          performanceService.recordAIRequest(Date.now() - startTime, result.tokensUsed, true);
+          return result;
+        } catch (error) {
+          logger.warn('Anthropic generation failed, trying OpenAI', error);
+          this.updateRateLimit('anthropic', error);
+        }
+      }
+
+      // Fallback to OpenAI
       if (this.openai && this.isServiceAvailable('openai')) {
         try {
           const result = await this.generateWithOpenAI(params);
@@ -110,8 +145,8 @@ class AIService {
         }
       }
 
-      // OpenAI failed, use fallback
-      logger.warn('OpenAI service failed, using fallback content');
+      // Both services failed, use fallback
+      logger.warn('All AI services failed, using fallback content');
       return this.generateFallbackContent(params);
 
     } catch (error) {
@@ -121,7 +156,26 @@ class AIService {
     }
   }
 
-  
+  async generateWithAnthropic(params) {
+    const { topic, contentType, platform, tone, extractedData } = params;
+
+    const systemPrompt = this.buildSystemPrompt(contentType, platform, tone);
+    const userPrompt = this.buildUserPrompt(topic, extractedData, params);
+
+    const response = await this.anthropic.messages.create({
+      model: "claude-3-sonnet-20240229",
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+      max_tokens: 4000
+    });
+
+    return {
+      content: response.content[0].text,
+      provider: 'anthropic',
+      model: 'claude-3-sonnet',
+      tokensUsed: response.usage?.output_tokens || 0
+    };
+  }
 
   async generateWithOpenAI(params) {
     const { topic, contentType, platform, tone, extractedData } = params;
@@ -265,9 +319,9 @@ ${suggestedContent ? 'Expanda a direção aprovada mantendo sua essência.' : ''
     return {
       initialized: this.initialized,
       openai: !!this.openai,
-      anthropic: false, // Disabled
+      anthropic: !!this.anthropic,
       fallbackMode: this.fallbackMode,
-      rateLimits: this.rateLimits.openai
+      rateLimits: this.rateLimits
     };
   }
 }

@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "web", "postgresql-16"]
+modules = ["nodejs-20", "web"]
 run = "node index.js"
 
 [nix]
@@ -26,7 +26,11 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd ViralCraft-AI && node server.js"
+args = "cd ViralCraft-AI && npm install --production"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd ViralCraft-AI && npm start"
 
 [[workflows.workflow]]
 name = "Development Mode"
@@ -67,23 +71,6 @@ args = "cd ViralCraft-AI && npm start"
 task = "shell.exec"
 args = "echo \"Viral Content Creator is starting...\""
 
-[[workflows.workflow]]
-name = "Light Database Setup"
-author = 36007645
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd ViralCraft-AI && node scripts/setup-light-db.js"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "echo \"Light database initialized successfully\""
-
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[[ports]]
-localPort = 5001
-externalPort = 3000

@@ -85,37 +85,6 @@ class CacheService {
       console.error('Cache clear error:', error);
     }
   }
-
-  getStats() {
-    return {
-      size: this.memoryCache.size,
-      hitRate: '0%',
-      hits: 0,
-      misses: 0,
-      requests: 0,
-      evictions: 0
-    };
-  }
-
-  async isHealthy() {
-    try {
-      // Test cache functionality
-      const testKey = '__health_check__';
-      const testValue = { timestamp: Date.now() };
-
-      await this.set(testKey, testValue, 1); // 1 second TTL
-      const retrieved = await this.get(testKey);
-      if (retrieved) {
-        const parsedRetrieved = JSON.parse(retrieved);
-        return parsedRetrieved.timestamp === testValue.timestamp;
-      }
-
-      return false;
-    } catch (error) {
-      console.error('Cache health check failed:', error);
-      return false;
-    }
-  }
 }
 
 module.exports = new CacheService();
