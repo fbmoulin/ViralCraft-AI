@@ -6,6 +6,7 @@ class DatabaseService {
     this.sequelize = null;
     this.models = {};
     this.isConnected = false;
+    this.isMigrating = false; // Add a flag to track migration status
   }
 
   async initialize() {
@@ -49,8 +50,8 @@ class DatabaseService {
       // Define models
       this.defineModels(isSqlite);
 
-      // Sync database
-      await this.sequelize.sync({ alter: true });
+      // Sync database - replaced with migration handling
+      await this.runMigrations();
 
       this.isConnected = true;
       return true;
@@ -79,7 +80,7 @@ class DatabaseService {
 
       await this.sequelize.authenticate();
       this.defineModels(true);
-      await this.sequelize.sync({ alter: true });
+      await this.runMigrations();
 
       console.log('✅ SQLite fallback initialized');
       this.isConnected = true;
@@ -88,6 +89,36 @@ class DatabaseService {
       console.error('❌ SQLite fallback failed:', error.message);
       this.isConnected = false;
       return false;
+    }
+  }
+
+  async runMigrations() {
+    // Run migrations with better error handling and loop prevention
+    try {
+      console.log('📋 Running database migrations...');
+
+      // Check if migrations are already running
+      if (this.isMigrating) {
+        console.log('⏳ Migrations already in progress, waiting...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return true;
+      }
+
+      this.isMigrating = true;
+
+      // Use logging: false to prevent SQL spam and alter: false to prevent loops
+      await this.sequelize.sync({ 
+        alter: false,
+        force: false,
+        logging: false
+      });
+
+      this.isMigrating = false;
+      console.log('✅ Database migrations completed');
+    } catch (migrationError) {
+      this.isMigrating = false;
+      console.error('❌ Migration error:', migrationError.message);
+      throw migrationError;
     }
   }
 

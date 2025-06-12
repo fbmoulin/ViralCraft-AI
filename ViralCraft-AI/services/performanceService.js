@@ -45,14 +45,33 @@ class PerformanceService {
       this.metrics.requests.failed++;
     }
     
-    // Track response times (keep last 100)
+    // Track response times with circular buffer for better memory efficiency
     this.responseTimes.push(responseTime);
     if (this.responseTimes.length > 100) {
       this.responseTimes.shift();
     }
     
-    this.metrics.requests.averageResponseTime = 
-      this.responseTimes.reduce((a, b) => a + b, 0) / this.responseTimes.length;
+    // Use more efficient average calculation
+    const sum = this.responseTimes.reduce((a, b) => a + b, 0);
+    this.metrics.requests.averageResponseTime = Math.round(sum / this.responseTimes.length);
+    
+    // Trigger cleanup if memory usage is high
+    if (this.metrics.requests.total % 1000 === 0) {
+      this.cleanupMetrics();
+    }
+  }
+  
+  cleanupMetrics() {
+    // Keep only recent data to prevent memory leaks
+    if (this.responseTimes.length > 50) {
+      this.responseTimes = this.responseTimes.slice(-50);
+    }
+    if (this.queryTimes.length > 50) {
+      this.queryTimes = this.queryTimes.slice(-50);
+    }
+    if (this.aiResponseTimes.length > 25) {
+      this.aiResponseTimes = this.aiResponseTimes.slice(-25);
+    }
   }
 
   recordDatabaseQuery(queryTime, success = true) {

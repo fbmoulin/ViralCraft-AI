@@ -1,4 +1,3 @@
-
 /**
  * AI Service - Robust integration with multiple AI providers
  * Implements fallbacks, retry logic, and error handling
@@ -24,7 +23,7 @@ class AIService {
 
   async initialize() {
     console.log('🤖 Initializing AI services...');
-    
+
     try {
       // Initialize OpenAI
       if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here') {
@@ -33,7 +32,7 @@ class AIService {
           timeout: 30000, // 30 second timeout
           maxRetries: 3
         });
-        
+
         // Test OpenAI connection
         await this.testOpenAI();
         console.log('✅ OpenAI service initialized and tested');
@@ -48,7 +47,7 @@ class AIService {
           timeout: 30000,
           maxRetries: 3
         });
-        
+
         console.log('✅ Anthropic service initialized');
       } else {
         console.warn('⚠️ Anthropic API key not configured');
@@ -73,7 +72,7 @@ class AIService {
 
   async testOpenAI() {
     if (!this.openai) return false;
-    
+
     try {
       await this.openai.chat.completions.create({
         model: "gpt-3.5-turbo",
@@ -89,7 +88,7 @@ class AIService {
 
   async generateContent(params) {
     const startTime = Date.now();
-    
+
     try {
       if (this.fallbackMode) {
         return this.generateFallbackContent(params);
@@ -132,7 +131,7 @@ class AIService {
 
   async generateWithAnthropic(params) {
     const { topic, contentType, platform, tone, extractedData } = params;
-    
+
     const systemPrompt = this.buildSystemPrompt(contentType, platform, tone);
     const userPrompt = this.buildUserPrompt(topic, extractedData, params);
 
@@ -153,7 +152,7 @@ class AIService {
 
   async generateWithOpenAI(params) {
     const { topic, contentType, platform, tone, extractedData } = params;
-    
+
     const systemPrompt = this.buildSystemPrompt(contentType, platform, tone);
     const userPrompt = this.buildUserPrompt(topic, extractedData, params);
 
@@ -177,7 +176,7 @@ class AIService {
 
   generateFallbackContent(params) {
     const { topic, contentType, platform } = params;
-    
+
     const templates = {
       'instagram': {
         'post': `🚀 ${topic} - O Guia Definitivo\n\n✨ Descubra os segredos que estão transformando ${topic}\n\n💡 3 dicas essenciais:\n• Foque no que realmente importa\n• Aplique o princípio 80/20\n• Meça seus resultados\n\n#${topic.replace(/\s+/g, '')} #ViralContent #Transformacao`,
@@ -232,7 +231,7 @@ Tipo: ${contentType}`;
 
   buildUserPrompt(topic, extractedData, params) {
     const { keywords, additionalContext, suggestedTitle, suggestedContent } = params;
-    
+
     return `
 Tópico: ${suggestedTitle || topic}
 Palavras-chave: ${keywords?.join(', ') || ''}
@@ -249,7 +248,7 @@ ${suggestedContent ? 'Expanda a direção aprovada mantendo sua essência.' : ''
   isServiceAvailable(service) {
     const now = Date.now();
     const rateLimit = this.rateLimits[service];
-    
+
     return now > rateLimit.resetTime;
   }
 

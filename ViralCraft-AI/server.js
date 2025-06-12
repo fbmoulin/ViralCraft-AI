@@ -40,12 +40,27 @@ app.use(compression());
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-// Serve static files from multiple directories
-app.use(express.static(path.join(__dirname, 'public')));
-app.use('/static', express.static(path.join(__dirname, 'static')));
+// Serve static files with caching headers
+const staticOptions = {
+  maxAge: process.env.NODE_ENV === 'production' ? '1y' : '1h',
+  etag: true,
+  lastModified: true,
+  setHeaders: (res, path) => {
+    // Set cache headers based on file type
+    if (path.endsWith('.css') || path.endsWith('.js')) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year
+    } else if (path.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'public, max-age=3600'); // 1 hour
+    }
+  }
+};
 
-// Initialize AI services
+app.use(express.static(path.join(__dirname, 'public'), staticOptions));
+app.use('/static', express.static(path.join(__dirname, 'static'), staticOptions));
+
+// Initialize AI services and middleware
 const aiService = require('./services/ai');
+const apiCache = require('./middleware/apiCache');
 
 const initializeAIServices = async () => {
   try {
@@ -191,7 +206,7 @@ app.get('/api/test-integration', async (req, res) => {
 });
 
 // Enhanced health check endpoint with monitoring
-app.get('/api/health', async (req, res) => {
+app.get('/api/health', apiCache(30000), async (req, res) => { // Cache for 30 seconds
   try {
     let dbStatus = { connected: false };
 
@@ -589,20 +604,7 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Add request logging middleware
-app.use((req, res, next) => {
-  const start = Date.now();
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    const log = `${req.method} ${req.originalUrl} ${res.statusCode} ${duration}ms`;
-    if (res.statusCode >= 400) {
-      console.error(`❌ ${log}`);
-    } else {
-      console.log(`✅ ${log}`);
-    }
-  });
-  next();
-});
+// Request logging is already handled by morgan middleware above
 
 // Enhanced error handling middleware
 app.use((err, req, res, next) => {
