@@ -573,11 +573,7 @@ app.post('/api/suggest', async (req, res) => {
         ],
         hook: `Você não vai acreditar no que descobrimos sobre ${topic}!`,
         provider: 'fallback'
-      };rompt }],
-        max_tokens: 1000
-      });
-
-      suggestion.content = response.content[0].text;
+      };
     } else if (global.openai) {
       // Fallback to OpenAI if Anthropic is not available
       const response = await global.openai.chat.completions.create({
