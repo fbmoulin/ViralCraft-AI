@@ -254,7 +254,7 @@ app.get('/api/test-integration', async (req, res) => {
       const aiStatus = global.aiService.getStatus();
       tests.aiService = { 
         status: aiStatus.initialized ? 'ok' : 'error', 
-        details: `OpenAI: ${aiStatus.openai ? '✅' : '❌'}, Anthropic: ${aiStatus.anthropic ? '✅' : '❌'}, Fallback: ${aiStatus.fallbackMode ? 'enabled' : 'disabled'}` 
+        details: `OpenAI: ${aiStatus.openai ? '✅' : '❌'} (Anthropic disabled), Fallback: ${aiStatus.fallbackMode ? 'enabled' : 'disabled'}` 
       };
     } else {
       tests.aiService = { status: 'error', details: 'AI service not initialized' };
