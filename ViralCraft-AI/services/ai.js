@@ -63,6 +63,10 @@ class AIService {
         this.fallbackMode = true;
       }
 
+      // Make services globally available for backwards compatibility
+      global.openai = this.openai;
+      global.anthropic = this.anthropic;
+
       // OpenAI Configuration
       if (process.env.OPENAI_API_KEY) {
         console.log('✅ OpenAI API key configured');
