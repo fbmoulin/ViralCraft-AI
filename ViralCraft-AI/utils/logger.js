@@ -2,18 +2,6 @@
 const winston = require('winston');
 const DailyRotateFile = require('winston-daily-rotate-file');
 const path = require('path');
-
-// Create logs directory if it doesn't exist
-const fs = require('fs');
-const logsDir = path.join(__dirname, '../logs');
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true });
-}
-
-// Configure winston logger
-const winston = require('winston');
-const DailyRotateFile = require('winston-daily-rotate-file');
-const path = require('path');
 const fs = require('fs');
 
 // Ensure logs directory exists
@@ -116,7 +104,6 @@ class LogMonitor {
     this.lastErrors = [];
     this.startTime = Date.now();
   }
-  }
 }
 
 const monitor = new LogMonitor();
@@ -153,4 +140,4 @@ const enhancedLogger = {
   resetStats: () => monitor.reset()
 };
 
-module.exports = enhancedLogger;er;
+module.exports = enhancedLogger;

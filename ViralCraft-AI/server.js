@@ -699,8 +699,6 @@ app.use((req, res, next) => {
     }
   });
   next();
-  });
-  next();
 });
 
 // Enhanced error handling middleware

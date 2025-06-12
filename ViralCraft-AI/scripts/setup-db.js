@@ -68,4 +68,4 @@ if (require.main === module) {
   setupDatabase();
 }
 
-module.exports = setupDatabase;
+module.exports = setupDatabase;dule.exports = setupDatabase;

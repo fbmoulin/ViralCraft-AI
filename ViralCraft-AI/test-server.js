@@ -23,7 +23,7 @@ async function testServer() {
     } catch (error) {
       console.log(`❌ ${test.name}: ${error.message}`);
     }
-    console.log('');
+    console.log('');le.log('');
   }
 
   // Test content generation (mock)
@@ -53,4 +53,4 @@ if (require.main === module) {
   testServer().catch(console.error);
 }
 
-module.exports = testServer;
+module.exports = testServer;le.exports = testServer;
