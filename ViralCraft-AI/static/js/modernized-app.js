@@ -849,12 +849,21 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // Add debug commands to console
-    console.log(`
+  console.log(`
 🔍 Debug Commands Available:
 - debugApp.getInfo() - Get system information
 - debugApp.testAI() - Test AI services
 - debugApp.clearLogs() - Clear application logs
-    `);
+
+🚀 User Workflow:
+1. Configure API keys in .env file
+2. Use the form to create content
+3. Try the "Suggest Ideas" feature first
+4. Generate and download your content
+  `);
+
+  // Initialize user workflow guidance
+  initUserWorkflowGuidance();
 
     // Initialize app when DOM is ready
     if (document.readyState === 'loading') {
@@ -862,4 +871,10 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         initApp();
     }
+
+  // User workflow guidance system
+  function initUserWorkflowGuidance() {
+      // This function will guide the user through the steps
+      console.log('User workflow guidance initialized.');
+  }
 });

@@ -8,7 +8,7 @@ channel = "stable-24_05"
 run = ["sh", "-c", "cd ViralCraft-AI && npm start"]
 
 [workflows]
-runButton = "Start Server"
+runButton = "Production Server"
 
 [[workflows.workflow]]
 name = "Start Server"
@@ -18,6 +18,58 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd ViralCraft-AI && npm start"
+
+[[workflows.workflow]]
+name = "Production Server"
+author = 36007645
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd ViralCraft-AI && npm install --production"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd ViralCraft-AI && npm start"
+
+[[workflows.workflow]]
+name = "Development Mode"
+author = 36007645
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd ViralCraft-AI && npm install"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd ViralCraft-AI && npm run dev"
+
+[[workflows.workflow]]
+name = "Database Setup"
+author = 36007645
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd ViralCraft-AI && node scripts/setup-db.js"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "echo \"Database initialized successfully\""
+
+[[workflows.workflow]]
+name = "Quick Start"
+author = 36007645
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd ViralCraft-AI && npm start"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "echo \"Viral Content Creator is starting...\""
 
 [[ports]]
 localPort = 5000
