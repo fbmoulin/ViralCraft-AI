@@ -57,6 +57,188 @@ document.addEventListener('DOMContentLoaded', () => {
  * Inicializa componentes críticos para a experiência inicial
  */
 function initializeCriticalComponents() {
+  // Inicializar navegação principal
+  const mainNav = document.querySelector('.main-nav');
+  if (mainNav) {
+    mainNav.classList.add('loaded');
+  }
+  
+  // Inicializar formulários principais
+  const forms = document.querySelectorAll('form');
+  forms.forEach(form => {
+    form.addEventListener('submit', handleFormSubmission);
+  });
+}
+
+/**
+ * Inicializa componentes não críticos de forma assíncrona
+ */
+function initializeNonCriticalComponents() {
+  // Configurar analytics
+  if (config.analyticsEnabled) {
+    initializeAnalytics();
+  }
+  
+  // Configurar lazy loading de imagens
+  setupImageLazyLoading();
+  
+  // Configurar animações
+  setupAnimations();
+}
+
+/**
+ * Configura o sistema de lazy loading para imagens
+ */
+function setupImageLazyLoading() {
+  if ('IntersectionObserver' in window) {
+    const imageObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const img = entry.target;
+          if (img.dataset.src) {
+            img.src = img.dataset.src;
+            img.removeAttribute('data-src');
+            imageObserver.unobserve(img);
+          }
+        }
+      });
+    });
+    
+    document.querySelectorAll('img[data-src]').forEach(img => {
+      imageObserver.observe(img);
+    });
+  }
+}
+
+/**
+ * Configura animações da interface
+ */
+function setupAnimations() {
+  // Adicionar animações de entrada para elementos
+  const animatedElements = document.querySelectorAll('.animate-on-scroll');
+  
+  if ('IntersectionObserver' in window) {
+    const animationObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('animated');
+          animationObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1 });
+    
+    animatedElements.forEach(el => {
+      animationObserver.observe(el);
+    });
+  } else {
+    // Fallback para navegadores sem suporte
+    animatedElements.forEach(el => {
+      el.classList.add('animated');
+    });
+  }
+}
+
+/**
+ * Inicializa o sistema de analytics
+ */
+function initializeAnalytics() {
+  // Configurar tracking de eventos
+  document.addEventListener('click', (e) => {
+    const target = e.target;
+    if (target.dataset.track) {
+      trackEvent(target.dataset.track, {
+        element: target.tagName,
+        text: target.textContent,
+        timestamp: Date.now()
+      });
+    }
+  });
+}
+
+/**
+ * Registra eventos para analytics
+ */
+function trackEvent(eventName, data) {
+  performanceMetrics.interactions.push({
+    event: eventName,
+    data: data,
+    timestamp: Date.now()
+  });
+  
+  // Limitar o array para evitar uso excessivo de memória
+  if (performanceMetrics.interactions.length > 100) {
+    performanceMetrics.interactions = performanceMetrics.interactions.slice(-50);
+  }
+}
+
+/**
+ * Inicia o monitoramento de desempenho
+ */
+function startPerformanceMonitoring() {
+  // Monitorar tempo de primeira interação
+  document.addEventListener('click', function recordFirstInteraction() {
+    if (performanceMetrics.firstInteraction === 0) {
+      performanceMetrics.firstInteraction = performance.now();
+      document.removeEventListener('click', recordFirstInteraction);
+    }
+  }, { once: true });
+  
+  // Monitorar uso de memória periodicamente
+  if ('memory' in performance) {
+    setInterval(() => {
+      const memInfo = performance.memory;
+      if (memInfo.usedJSHeapSize > memInfo.jsHeapSizeLimit * 0.9) {
+        console.warn('Alto uso de memória detectado');
+        // Limpar caches se necessário
+        clearOldCacheEntries();
+      }
+    }, 30000); // Verificar a cada 30 segundos
+  }
+}
+
+/**
+ * Limpa entradas antigas do cache
+ */
+function clearOldCacheEntries() {
+  const now = Date.now();
+  
+  for (const [key, value] of componentCache.entries()) {
+    if (value.timestamp && (now - value.timestamp) > config.cacheTTL) {
+      componentCache.delete(key);
+    }
+  }
+  
+  for (const [key, value] of dataCache.entries()) {
+    if (value.timestamp && (now - value.timestamp) > config.cacheTTL) {
+      dataCache.delete(key);
+    }
+  }
+}
+
+/**
+ * Manipula o envio de formulários
+ */
+function handleFormSubmission(event) {
+  const form = event.target;
+  const submitButton = form.querySelector('button[type="submit"]');
+  
+  // Adicionar estado de loading
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.classList.add('loading');
+  }
+  
+  // Registrar evento
+  trackEvent('form_submit', {
+    formId: form.id,
+    action: form.action
+  });
+}
+
+/**
+ * Inicializa componentes críticos para a experiência inicialência inicial
+ */
+function initializeCriticalComponents() {
   // Inicializar navegação por abas
   initTabNavigation();
   
@@ -387,6 +569,7 @@ function loadAdditionalResources() {
     // Observar todas as imagens com lazy loading
     document.querySelectorAll('img[data-src]').forEach(img => {
       imageObserver.observe(img);
+    });bserve(img);
     });
   }
 }

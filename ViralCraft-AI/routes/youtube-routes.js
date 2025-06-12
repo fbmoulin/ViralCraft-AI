@@ -93,4 +93,4 @@ router.get('/analysis/:id', async (req, res) => {
   }
 });
 
-module.exports = router;outer;
+module.exports = router;
