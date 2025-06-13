@@ -14,6 +14,11 @@
             "date": 1749705545325,
             "name": "/home/runner/workspace/ViralCraft-AI/logs/error-2025-06-12.log",
             "hash": "54c515c06f572db645d4a7935378239ea5ced1bd2da1fbb9827b12ba78a47ea9"
+        },
+        {
+            "date": 1749772908759,
+            "name": "/home/runner/workspace/ViralCraft-AI/logs/error-2025-06-13.log",
+            "hash": "804cc7d0a461685375850131c5bb7fae0305eff32b163c0cab7ceb16c75804a6"
         }
     ],
     "hashType": "sha256"
