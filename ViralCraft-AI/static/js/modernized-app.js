@@ -570,9 +570,14 @@ document.addEventListener('DOMContentLoaded', function() {
       displaySuggestion(data);
       showNotification('Sugestão gerada com sucesso!', 'success');
     } catch (error) {
-      console.error('Erro na sugestão:', error);
-      throw error;
-    }
+            console.error('Erro na sugestão:', error);
+            console.error('Error details:', {
+                message: error.message,
+                stack: error.stack,
+                response: error.response
+            });
+            showNotification('Erro ao gerar sugestões: ' + (error.message || 'Erro desconhecido'), 'error');
+        }
   }
 
   // Extração de conteúdo de arquivo

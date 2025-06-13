@@ -31,7 +31,7 @@ class AIService {
       if (process.env.OPENAI_API_KEY && 
           process.env.OPENAI_API_KEY !== 'your_openai_api_key_here' &&
           process.env.OPENAI_API_KEY.length > 20) {
-        
+
         console.log('🔧 Creating OpenAI client...');
         this.openai = new OpenAI({
           apiKey: process.env.OPENAI_API_KEY,
@@ -92,7 +92,7 @@ class AIService {
         messages: [{ role: "user", content: "Test" }],
         max_tokens: 5
       });
-      
+
       console.log('✅ OpenAI API test successful');
       console.log(`📊 Model used: ${response.model}`);
       console.log(`🎯 Tokens used: ${response.usage?.total_tokens || 0}`);
@@ -104,7 +104,7 @@ class AIService {
         type: error.type,
         code: error.code
       });
-      
+
       if (error.status === 401) {
         console.error('🔑 Authentication failed - check your API key');
       } else if (error.status === 429) {
@@ -112,7 +112,7 @@ class AIService {
       } else if (error.status >= 500) {
         console.error('🔧 OpenAI server error - try again later');
       }
-      
+
       logger.warn('OpenAI test failed', error);
       return false;
     }
@@ -149,7 +149,7 @@ class AIService {
     }
   }
 
-  
+
 
   async generateWithOpenAI(params) {
     const { topic, contentType, platform, tone, extractedData } = params;
