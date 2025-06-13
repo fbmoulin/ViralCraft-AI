@@ -649,39 +649,101 @@ const logServerInfo = (port, dbConnected) => {
   console.log('─'.repeat(50));
 };
 
-// Start server
+// Optimized server startup with enhanced error handling
 const startServer = async () => {
   try {
-    // Always use PORT from env or default to 5000 instead of 3000 (which is often in use)
+    console.log('🔧 Starting optimized server initialization...');
+    
+    // Initialize services in parallel where possible
+    const [dbConnected] = await Promise.all([
+      connectDB(),
+      // Add other async initialization here
+    ]);
+
     const port = process.env.PORT || 5000;
-    // Connect to database
-    const dbConnected = await connectDB();
-    // Attempt to start server
-    const startServerOnPort = (portToUse) => {
-      return new Promise((resolve, reject) => {
-        const server = app.listen(portToUse, '0.0.0.0', () => {
-          logServerInfo(portToUse, dbConnected);
-          resolve(server);
-        }).on('error', (err) => {
-          if (err.code === 'EADDRINUSE') {
-            console.warn(`⚠️ Port ${portToUse} is already in use, trying alternative port...`);
-            server.close();
-            // If the specified port is in use, try port 5000, or increment by 1 if already trying alternative
-            const alternativePort = portToUse === port ? 5000 : portToUse + 1;
-            resolve(startServerOnPort(alternativePort));
+    
+    // Enhanced port selection with better error handling
+    const startServerOnPort = async (portToUse, maxRetries = 5) => {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          return await new Promise((resolve, reject) => {
+            const server = app.listen(portToUse, '0.0.0.0', () => {
+              logServerInfo(portToUse, dbConnected);
+              
+              // Setup graceful shutdown
+              setupGracefulShutdown(server);
+              
+              resolve(server);
+            }).on('error', reject);
+          });
+        } catch (err) {
+          if (err.code === 'EADDRINUSE' && attempt < maxRetries) {
+            const nextPort = portToUse + attempt;
+            console.warn(`⚠️ Port ${portToUse} in use, trying port ${nextPort}...`);
+            portToUse = nextPort;
           } else {
-            reject(err);
+            throw err;
           }
-        });
-      });
+        }
+      }
+      throw new Error(`Could not start server after ${maxRetries} attempts`);
     };
+
     await startServerOnPort(port);
+    
   } catch (error) {
-    console.error('Fatal error starting server:', error);
-    console.error(error.stack);
+    console.error('❌ Fatal error starting server:', error.message);
+    console.error('Stack trace:', error.stack);
+    
+    // Cleanup before exit
+    await gracefulCleanup();
     process.exit(1);
   }
 };
+
+// Graceful shutdown handler
+function setupGracefulShutdown(server) {
+  const gracefulShutdown = async (signal) => {
+    console.log(`\n🛑 Received ${signal}, starting graceful shutdown...`);
+    
+    server.close(async () => {
+      console.log('🔌 HTTP server closed');
+      await gracefulCleanup();
+      process.exit(0);
+    });
+    
+    // Force close after 30 seconds
+    setTimeout(() => {
+      console.error('❌ Forced shutdown after timeout');
+      process.exit(1);
+    }, 30000);
+  };
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+}
+
+// Cleanup function
+async function gracefulCleanup() {
+  console.log('🧹 Starting cleanup...');
+  
+  try {
+    // Close database connections
+    if (global.db && global.db.close) {
+      await global.db.close();
+      console.log('📊 Database connections closed');
+    }
+    
+    // Clear any timers or intervals
+    if (global.performanceService) {
+      // Cleanup performance monitoring
+    }
+    
+    console.log('✅ Cleanup completed');
+  } catch (error) {
+    console.error('❌ Error during cleanup:', error.message);
+  }
+}
 
 // Start the server with debug logging
 console.log('🚀 Starting ViralCraft-AI server...');

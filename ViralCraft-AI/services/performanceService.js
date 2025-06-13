@@ -62,15 +62,27 @@ class PerformanceService {
   }
   
   cleanupMetrics() {
-    // Keep only recent data to prevent memory leaks
-    if (this.responseTimes.length > 50) {
-      this.responseTimes = this.responseTimes.slice(-50);
+    // Enhanced cleanup with circular buffer optimization
+    const maxSamples = 100;
+    
+    if (this.responseTimes.length > maxSamples) {
+      this.responseTimes = this.responseTimes.slice(-maxSamples);
     }
-    if (this.queryTimes.length > 50) {
-      this.queryTimes = this.queryTimes.slice(-50);
+    if (this.queryTimes.length > maxSamples) {
+      this.queryTimes = this.queryTimes.slice(-maxSamples);
     }
-    if (this.aiResponseTimes.length > 25) {
-      this.aiResponseTimes = this.aiResponseTimes.slice(-25);
+    if (this.aiResponseTimes.length > maxSamples) {
+      this.aiResponseTimes = this.aiResponseTimes.slice(-maxSamples);
+    }
+    
+    // Force garbage collection hint
+    if (global.gc && this.metrics.requests.total % 5000 === 0) {
+      try {
+        global.gc();
+        console.log('🧹 Garbage collection triggered for performance optimization');
+      } catch (error) {
+        // Ignore if gc is not available
+      }
     }
   }
 

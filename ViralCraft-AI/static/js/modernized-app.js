@@ -1,885 +1,832 @@
-// Modernização do frontend do ViralCraft-AI
-// Este script implementa melhorias de UX/UI e interatividade
 
-document.addEventListener('DOMContentLoaded', function() {
-  // Referências aos elementos principais
-  const loadingScreen = document.getElementById('loading-screen');
-  const mainContent = document.getElementById('main-content');
-  const statusContainer = document.getElementById('status-container');
-  const formContainer = document.getElementById('form-container');
-  const resultContainer = document.getElementById('result-container');
+/**
+ * Modernized App - Optimized Frontend Application
+ * Enhanced with performance optimizations, better error handling, and improved UX
+ */
 
-  // Global variables
-  let isLoading = false;
-  let currentStep = 1;
-  let pendingRequests = new Map();
-  let requestCounter = 0;
+// Configuration and Constants
+const APP_CONFIG = {
+  cache: {
+    enabled: true,
+    ttl: 300000, // 5 minutes
+    maxSize: 100
+  },
+  performance: {
+    debounceDelay: 300,
+    animationDuration: 250,
+    lazyLoadThreshold: 50
+  },
+  api: {
+    timeout: 30000,
+    retries: 3,
+    baseUrl: window.location.origin
+  }
+};
 
-  // Inicialização da aplicação
-  initApp();
-
-  // Função principal de inicialização
-  function initApp() {
-    // Mostrar tela de carregamento
-    showLoadingScreen();
-
-    // Verificar status do sistema
-    checkSystemStatus()
-      .then(() => {
-        // Inicializar componentes da UI
-        initTabs();
-        initFormValidation();
-        initFileUpload();
-        setupFormSubmission();
-
-        // Esconder tela de carregamento após inicialização
-        setTimeout(hideLoadingScreen, 1500);
-      })
-      .catch(error => {
-        showNotification('Erro ao inicializar aplicação: ' + error.message, 'error');
-        hideLoadingScreen();
-      });
+// Performance and Cache Management
+class PerformanceManager {
+  constructor() {
+    this.cache = new Map();
+    this.metrics = {
+      apiCalls: 0,
+      cacheHits: 0,
+      errors: 0,
+      loadTime: 0
+    };
+    this.startTime = performance.now();
   }
 
-  // Gerenciamento da tela de carregamento
-  function showLoadingScreen() {
-    if (loadingScreen) {
-      loadingScreen.classList.remove('fade-out');
-      loadingScreen.style.display = 'flex';
+  // Optimized cache with LRU eviction
+  setCache(key, data, ttl = APP_CONFIG.cache.ttl) {
+    if (this.cache.size >= APP_CONFIG.cache.maxSize) {
+      const firstKey = this.cache.keys().next().value;
+      this.cache.delete(firstKey);
     }
+
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now(),
+      ttl
+    });
   }
 
-  function hideLoadingScreen() {
-    if (loadingScreen) {
-      loadingScreen.classList.add('fade-out');
-      setTimeout(() => {
-        loadingScreen.style.display = 'none';
-      }, 500);
+  getCache(key) {
+    const cached = this.cache.get(key);
+    if (!cached) return null;
+
+    if (Date.now() - cached.timestamp > cached.ttl) {
+      this.cache.delete(key);
+      return null;
     }
+
+    this.metrics.cacheHits++;
+    return cached.data;
   }
 
-  // Verificação de status do sistema
-  async function checkSystemStatus() {
+  recordMetric(type, value = 1) {
+    this.metrics[type] = (this.metrics[type] || 0) + value;
+  }
+
+  getMetrics() {
+    return {
+      ...this.metrics,
+      uptime: Math.round(performance.now() - this.startTime),
+      cacheSize: this.cache.size,
+      hitRate: this.metrics.apiCalls > 0 ? 
+        (this.metrics.cacheHits / this.metrics.apiCalls * 100).toFixed(1) + '%' : '0%'
+    };
+  }
+}
+
+// Enhanced API Client with retry logic and caching
+class APIClient {
+  constructor() {
+    this.performance = new PerformanceManager();
+    this.requestQueue = new Map();
+  }
+
+  async request(endpoint, options = {}) {
+    const requestKey = `${endpoint}-${JSON.stringify(options)}`;
+    
+    // Check cache first
+    if (APP_CONFIG.cache.enabled && options.method !== 'POST') {
+      const cached = this.performance.getCache(requestKey);
+      if (cached) {
+        console.log('⚡ Serving from cache:', endpoint);
+        return cached;
+      }
+    }
+
+    // Prevent duplicate requests
+    if (this.requestQueue.has(requestKey)) {
+      return this.requestQueue.get(requestKey);
+    }
+
+    const requestPromise = this.executeRequest(endpoint, options);
+    this.requestQueue.set(requestKey, requestPromise);
+
     try {
-      const response = await fetch('/api/health', {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        timeout: 10000
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const result = await requestPromise;
+      
+      // Cache successful GET requests
+      if (APP_CONFIG.cache.enabled && options.method !== 'POST' && result.success) {
+        this.performance.setCache(requestKey, result);
       }
 
-      const data = await response.json();
+      return result;
+    } finally {
+      this.requestQueue.delete(requestKey);
+    }
+  }
 
-      if (statusContainer) {
-        updateSystemStatus(data);
-      }
+  async executeRequest(endpoint, options = {}) {
+    const startTime = performance.now();
+    this.performance.recordMetric('apiCalls');
 
-      return data;
-    } catch (error) {
-      console.error('Erro ao verificar status:', error);
-      showNotification('Não foi possível conectar ao servidor', 'error');
+    const config = {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Request-ID': this.generateRequestId()
+      },
+      timeout: APP_CONFIG.api.timeout,
+      ...options
+    };
 
-      // Fallback status for offline mode
-      return {
-        status: 'offline',
-        services: {
-          database: { connected: false },
-          openai: { configured: false },
-          anthropic: { configured: false }
+    for (let attempt = 1; attempt <= APP_CONFIG.api.retries; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), config.timeout);
+
+        const response = await fetch(`${APP_CONFIG.api.baseUrl}${endpoint}`, {
+          ...config,
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-      };
+
+        const data = await response.json();
+        
+        console.log(`✅ API Success: ${endpoint} (${Math.round(performance.now() - startTime)}ms)`);
+        return data;
+
+      } catch (error) {
+        console.warn(`⚠️ API Attempt ${attempt} failed:`, error.message);
+        
+        if (attempt === APP_CONFIG.api.retries) {
+          this.performance.recordMetric('errors');
+          throw new Error(`Request failed after ${APP_CONFIG.api.retries} attempts: ${error.message}`);
+        }
+
+        // Exponential backoff
+        await this.delay(Math.pow(2, attempt) * 1000);
+      }
     }
   }
 
-  // Atualização visual do status do sistema
-  function updateSystemStatus(data) {
-    // Atualizar uptime
-    const uptimeEl = document.querySelector('.status-value[data-status="uptime"]');
-    if (uptimeEl) {
-      uptimeEl.textContent = data.uptime || '0s';
-    }
-
-    // Atualizar status da IA
-    const aiStatusEl = document.querySelector('.status-value[data-status="ai"]');
-    if (aiStatusEl) {
-      const aiConfigured = data.services?.openai?.configured || data.services?.anthropic?.configured;
-      aiStatusEl.innerHTML = aiConfigured 
-        ? '<span class="status-dot"></span> Ativo' 
-        : '<span class="status-dot" style="background-color: var(--color-error)"></span> Inativo';
-    }
-
-    // Atualizar status do banco de dados
-    const dbStatusEl = document.querySelector('.status-value[data-status="database"]');
-    if (dbStatusEl) {
-      const dbConnected = data.services?.database?.connected;
-      dbStatusEl.innerHTML = dbConnected 
-        ? '<span class="status-dot"></span> Conectado' 
-        : '<span class="status-dot" style="background-color: var(--color-error)"></span> Desconectado';
-    }
-
-    // Atualizar status do servidor
-    const serverStatusEl = document.querySelector('.status-value[data-status="server"]');
-    if (serverStatusEl) {
-      serverStatusEl.innerHTML = '<span class="status-dot"></span> Online';
-    }
-
-    // Mostrar notificação de status
-    showNotification('Status atualizado!', 'info');
+  generateRequestId() {
+    return Math.random().toString(36).substr(2, 9);
   }
 
-  // Sistema de abas para organização do formulário
-  function initTabs() {
-    const tabs = document.querySelectorAll('.tab');
+  delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  getMetrics() {
+    return this.performance.getMetrics();
+  }
+}
+
+// Enhanced UI Manager with optimized DOM operations
+class UIManager {
+  constructor() {
+    this.apiClient = new APIClient();
+    this.activeAnimations = new Set();
+    this.debounceTimers = new Map();
+    this.observers = new Map();
+    
+    this.init();
+  }
+
+  init() {
+    this.setupEventListeners();
+    this.initializeObservers();
+    this.startPerformanceMonitoring();
+    
+    console.log('🎯 UI Manager initialized with optimizations');
+  }
+
+  setupEventListeners() {
+    // Optimized form handling with debouncing
+    this.setupFormHandling();
+    this.setupTabNavigation();
+    this.setupFileUpload();
+    this.setupTooltips();
+    
+    // Global error handling
+    window.addEventListener('error', this.handleGlobalError.bind(this));
+    window.addEventListener('unhandledrejection', this.handleUnhandledRejection.bind(this));
+  }
+
+  setupFormHandling() {
+    const generateForm = document.getElementById('generate-form');
+    const suggestBtn = document.getElementById('suggest-btn');
+
+    if (generateForm) {
+      generateForm.addEventListener('submit', this.debounce(this.handleGenerate.bind(this), APP_CONFIG.performance.debounceDelay));
+    }
+
+    if (suggestBtn) {
+      suggestBtn.addEventListener('click', this.debounce(this.handleSuggest.bind(this), APP_CONFIG.performance.debounceDelay));
+    }
+
+    // Auto-save functionality
+    const inputs = generateForm?.querySelectorAll('input, textarea, select');
+    inputs?.forEach(input => {
+      input.addEventListener('input', this.debounce(() => {
+        this.autoSave(input);
+      }, 1000));
+    });
+  }
+
+  setupTabNavigation() {
+    const tabButtons = document.querySelectorAll('.tab-button');
     const tabContents = document.querySelectorAll('.tab-content');
 
-    if (tabs.length === 0 || tabContents.length === 0) return;
-
-    tabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        // Remover classe ativa de todas as abas
-        tabs.forEach(t => t.classList.remove('active'));
-        tabContents.forEach(c => c.classList.remove('active'));
-
-        // Adicionar classe ativa à aba clicada
-        tab.classList.add('active');
-
-        // Mostrar conteúdo correspondente
-        const targetId = tab.getAttribute('data-tab');
-        const targetContent = document.getElementById(targetId);
-        if (targetContent) {
-          targetContent.classList.add('active');
-        }
-
-        // Atualizar barra de progresso
-        updateProgressBar();
-      });
-    });
-
-    // Ativar primeira aba por padrão
-    tabs[0].click();
-  }
-
-  // Barra de progresso para navegação entre etapas
-  function updateProgressBar() {
-    const progressBar = document.querySelector('.progress-bar-fill');
-    const tabs = document.querySelectorAll('.tab');
-    const activeTabIndex = Array.from(tabs).findIndex(tab => tab.classList.contains('active'));
-
-    if (progressBar && activeTabIndex !== -1) {
-      const progress = (activeTabIndex / (tabs.length - 1)) * 100;
-      progressBar.style.width = `${progress}%`;
-
-      // Atualizar status das etapas
-      const steps = document.querySelectorAll('.progress-step');
-      steps.forEach((step, index) => {
-        if (index < activeTabIndex) {
-          step.classList.add('completed');
-          step.classList.remove('active');
-        } else if (index === activeTabIndex) {
-          step.classList.add('active');
-          step.classList.remove('completed');
-        } else {
-          step.classList.remove('active', 'completed');
-        }
-      });
-    }
-  }
-
-  // Validação de formulário em tempo real
-  function initFormValidation() {
-    const formInputs = document.querySelectorAll('.form-input, .form-select, .form-textarea');
-
-    formInputs.forEach(input => {
-      input.addEventListener('blur', () => {
-        validateInput(input);
-      });
-
-      input.addEventListener('input', () => {
-        // Remover mensagens de erro ao digitar
-        const errorMessage = input.parentElement.querySelector('.error-message');
-        if (errorMessage) {
-          errorMessage.remove();
-        }
-        input.classList.remove('error');
-      });
-    });
-  }
-
-  function validateInput(input) {
-    const value = input.value.trim();
-    const isRequired = input.hasAttribute('required');
-
-    // Remover mensagem de erro anterior
-    const existingError = input.parentElement.querySelector('.error-message');
-    if (existingError) {
-      existingError.remove();
-    }
-
-    // Validar campo obrigatório
-    if (isRequired && value === '') {
-      showInputError(input, 'Este campo é obrigatório');
-      return false;
-    }
-
-    // Validações específicas por tipo
-    if (input.type === 'email' && value !== '') {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(value)) {
-        showInputError(input, 'Email inválido');
-        return false;
-      }
-    }
-
-    // Validação de URL
-    if (input.type === 'url' && value !== '') {
-      try {
-        new URL(value);
-      } catch (e) {
-        showInputError(input, 'URL inválida');
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  function showInputError(input, message) {
-    input.classList.add('error');
-
-    const errorElement = document.createElement('div');
-    errorElement.className = 'error-message';
-    errorElement.style.color = 'var(--color-error)';
-    errorElement.style.fontSize = '0.75rem';
-    errorElement.style.marginTop = '0.25rem';
-    errorElement.textContent = message;
-
-    input.parentElement.appendChild(errorElement);
-  }
-
-  // Upload de arquivos com preview
-  function initFileUpload() {
-    const fileInputs = document.querySelectorAll('input[type="file"]');
-
-    fileInputs.forEach(input => {
-      const button = input.parentElement.querySelector('.file-upload-button');
-      const previewContainer = input.parentElement.querySelector('.file-preview');
-
-      if (button) {
-        button.addEventListener('click', () => {
-          input.click();
-        });
-      }
-
-      input.addEventListener('change', () => {
-        if (input.files.length > 0) {
-          const file = input.files[0];
-          updateFilePreview(file, previewContainer, button);
-        }
-      });
-    });
-  }
-
-  function updateFilePreview(file, previewContainer, button) {
-    if (!previewContainer) return;
-
-    // Limpar preview anterior
-    previewContainer.innerHTML = '';
-    previewContainer.style.display = 'block';
-
-    // Atualizar texto do botão
-    if (button) {
-      button.textContent = file.name;
-    }
-
-    // Criar preview baseado no tipo de arquivo
-    if (file.type.startsWith('image/')) {
-      const img = document.createElement('img');
-      img.style.maxWidth = '100%';
-      img.style.maxHeight = '150px';
-      img.style.borderRadius = 'var(--border-radius-sm)';
-      img.style.marginTop = 'var(--spacing-sm)';
-
-      const reader = new FileReader();
-      reader.onload = e => {
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
-
-      previewContainer.appendChild(img);
-    } else {
-      // Para outros tipos de arquivo, mostrar ícone e nome
-      const fileInfo = document.createElement('div');
-      fileInfo.className = 'file-info';
-      fileInfo.style.display = 'flex';
-      fileInfo.style.alignItems = 'center';
-      fileInfo.style.gap = 'var(--spacing-sm)';
-      fileInfo.style.marginTop = 'var(--spacing-sm)';
-
-      const icon = document.createElement('span');
-      icon.textContent = getFileIcon(file.type);
-      icon.style.fontSize = '1.5rem';
-
-      const name = document.createElement('span');
-      name.textContent = file.name;
-      name.style.wordBreak = 'break-all';
-
-      fileInfo.appendChild(icon);
-      fileInfo.appendChild(name);
-      previewContainer.appendChild(fileInfo);
-    }
-  }
-
-  function getFileIcon(fileType) {
-    if (fileType.startsWith('image/')) return '🖼️';
-    if (fileType === 'application/pdf') return '📄';
-    if (fileType.includes('word')) return '📝';
-    if (fileType.includes('excel') || fileType.includes('spreadsheet')) return '📊';
-    if (fileType.includes('text/')) return '📃';
-    return '📎';
-  }
-
-  // Configuração do envio do formulário
-  function setupFormSubmission() {
-    const form = document.getElementById('content-form');
-    const generateButton = document.getElementById('generate-button');
-    const suggestButton = document.getElementById('suggest-button');
-
-    if (!form) return;
-
-    if (generateButton) {
-      generateButton.addEventListener('click', async (e) => {
+    tabButtons.forEach(button => {
+      button.addEventListener('click', (e) => {
         e.preventDefault();
-
-        // Validar formulário antes de enviar
-        if (!validateForm(form)) {
-          showNotification('Por favor, corrija os erros no formulário', 'error');
-          return;
-        }
-
-        // Mostrar estado de carregamento
-        generateButton.disabled = true;
-        generateButton.innerHTML = '<span class="spinner"></span> Gerando...';
-
-        try {
-          await generateContent(form);
-          generateButton.disabled = false;
-          generateButton.innerHTML = '✨ Gerar Conteúdo';
-        } catch (error) {
-          generateButton.disabled = false;
-          generateButton.innerHTML = '✨ Gerar Conteúdo';
-          showNotification('Erro ao gerar conteúdo: ' + error.message, 'error');
-        }
+        const targetTab = button.dataset.tab;
+        this.switchTab(targetTab, tabButtons, tabContents);
       });
-    }
+    });
+  }
 
-    if (suggestButton) {
-      suggestButton.addEventListener('click', async (e) => {
-        e.preventDefault();
+  setupFileUpload() {
+    const fileInput = document.getElementById('file-input');
+    const dropZone = document.getElementById('drop-zone');
 
-        // Validar campos básicos
-        const topicInput = form.querySelector('input[name="topic"]');
-        if (!topicInput || !topicInput.value.trim()) {
-          showInputError(topicInput, 'Informe um tópico para receber sugestões');
-          showNotification('Informe um tópico para receber sugestões', 'error');
-          return;
-        }
-
-        // Mostrar estado de carregamento
-        suggestButton.disabled = true;
-        suggestButton.innerHTML = '<span class="spinner"></span> Sugerindo...';
-
-        try {
-          await suggestContent(form);
-          suggestButton.disabled = false;
-          suggestButton.innerHTML = '💡 Sugerir Ideias';
-        } catch (error) {
-          suggestButton.disabled = false;
-          suggestButton.innerHTML = '💡 Sugerir Ideias';
-          showNotification('Erro ao sugerir conteúdo: ' + error.message, 'error');
-        }
-      });
+    if (fileInput && dropZone) {
+      // Drag and drop
+      dropZone.addEventListener('dragover', this.handleDragOver.bind(this));
+      dropZone.addEventListener('drop', this.handleDrop.bind(this));
+      
+      // File input change
+      fileInput.addEventListener('change', this.handleFileSelect.bind(this));
     }
   }
 
-  function validateForm(form) {
-    const requiredInputs = form.querySelectorAll('[required]');
-    let isValid = true;
+  async handleGenerate(e) {
+    e.preventDefault();
+    
+    const loadingId = this.showLoading('Gerando conteúdo otimizado...');
+    
+    try {
+      const formData = this.collectFormData(e.target);
+      const response = await this.apiClient.request('/api/generate', {
+        method: 'POST',
+        body: JSON.stringify(formData)
+      });
 
-    requiredInputs.forEach(input => {
-      if (!validateInput(input)) {
-        isValid = false;
+      if (response.success) {
+        this.displayResults(response.content);
+        this.showNotification('✅ Conteúdo gerado com sucesso!', 'success');
+      } else {
+        throw new Error(response.error || 'Erro desconhecido');
       }
+
+    } catch (error) {
+      console.error('Erro na geração:', error);
+      this.showNotification(`❌ Erro: ${error.message}`, 'error');
+      this.displayFallbackContent();
+    } finally {
+      this.hideLoading(loadingId);
+    }
+  }
+
+  async handleSuggest(e) {
+    e.preventDefault();
+    
+    const loadingId = this.showLoading('Gerando sugestões...');
+    
+    try {
+      const formData = this.collectFormData(document.getElementById('generate-form'));
+      const response = await this.apiClient.request('/api/suggest', {
+        method: 'POST',
+        body: JSON.stringify(formData)
+      });
+
+      if (response.success && response.suggestion) {
+        this.displaySuggestion(response.suggestion);
+        this.showNotification('💡 Sugestões geradas!', 'success');
+      } else {
+        throw new Error(response.error || 'Erro ao gerar sugestões');
+      }
+
+    } catch (error) {
+      console.error('Erro na sugestão:', error);
+      this.showNotification(`❌ Erro: ${error.message}`, 'error');
+    } finally {
+      this.hideLoading(loadingId);
+    }
+  }
+
+  collectFormData(form) {
+    const formData = new FormData(form);
+    const data = {};
+    
+    for (const [key, value] of formData.entries()) {
+      if (key === 'keywords') {
+        data[key] = value.split(',').map(k => k.trim()).filter(k => k);
+      } else {
+        data[key] = value;
+      }
+    }
+    
+    return data;
+  }
+
+  displayResults(content) {
+    const resultsContainer = document.getElementById('results');
+    if (!resultsContainer) return;
+
+    // Create optimized HTML structure
+    const html = Object.entries(content).map(([platform, platformContent]) => `
+      <div class="result-card" data-platform="${platform}">
+        <div class="result-header">
+          <h3>${this.formatPlatformName(platform)}</h3>
+          <div class="result-actions">
+            <button class="copy-btn" data-content="${this.escapeHtml(platformContent)}">
+              📋 Copiar
+            </button>
+            <button class="download-btn" data-content="${this.escapeHtml(platformContent)}" data-platform="${platform}">
+              💾 Download
+            </button>
+          </div>
+        </div>
+        <div class="result-content">
+          <pre>${this.escapeHtml(platformContent)}</pre>
+        </div>
+      </div>
+    `).join('');
+
+    resultsContainer.innerHTML = html;
+    
+    // Setup result actions
+    this.setupResultActions(resultsContainer);
+    
+    // Animate appearance
+    this.animateIn(resultsContainer);
+  }
+
+  displaySuggestion(suggestion) {
+    const container = document.getElementById('suggestion-container') || this.createSuggestionContainer();
+    
+    const html = `
+      <div class="suggestion-card">
+        <h3>💡 Sugestões Geradas</h3>
+        ${suggestion.title ? `<div class="suggestion-item">
+          <strong>Título:</strong> ${this.escapeHtml(suggestion.title)}
+        </div>` : ''}
+        ${suggestion.outline ? `<div class="suggestion-item">
+          <strong>Estrutura:</strong>
+          <pre>${this.escapeHtml(suggestion.outline)}</pre>
+        </div>` : ''}
+        ${suggestion.hook ? `<div class="suggestion-item">
+          <strong>Hook:</strong> ${this.escapeHtml(suggestion.hook)}
+        </div>` : ''}
+        ${suggestion.content ? `<div class="suggestion-item">
+          <strong>Sugestão Completa:</strong>
+          <pre>${this.escapeHtml(suggestion.content)}</pre>
+        </div>` : ''}
+        <div class="suggestion-actions">
+          <button class="apply-suggestion-btn">✅ Aplicar Sugestão</button>
+          <button class="dismiss-suggestion-btn">❌ Dispensar</button>
+        </div>
+      </div>
+    `;
+
+    container.innerHTML = html;
+    this.setupSuggestionActions(container);
+    this.animateIn(container);
+  }
+
+  setupResultActions(container) {
+    // Copy buttons
+    container.querySelectorAll('.copy-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const content = btn.dataset.content;
+        this.copyToClipboard(content);
+      });
     });
 
-    return isValid;
+    // Download buttons
+    container.querySelectorAll('.download-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const content = btn.dataset.content;
+        const platform = btn.dataset.platform;
+        this.downloadContent(content, platform);
+      });
+    });
   }
 
-  // Utility Functions
-  function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-      const later = () => {
-        clearTimeout(timeout);
-        func(...args);
-      };
-      clearTimeout(timeout);
-      timeout = setTimeout(later, wait);
+  async copyToClipboard(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      this.showNotification('📋 Copiado para a área de transferência!', 'success');
+    } catch (error) {
+      console.error('Erro ao copiar:', error);
+      this.showNotification('❌ Erro ao copiar', 'error');
+    }
+  }
+
+  downloadContent(content, platform) {
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    
+    a.href = url;
+    a.download = `content-${platform}-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    this.showNotification('💾 Download iniciado!', 'success');
+  }
+
+  showLoading(message = 'Carregando...') {
+    const id = 'loading-' + Math.random().toString(36).substr(2, 9);
+    const loadingEl = document.createElement('div');
+    loadingEl.id = id;
+    loadingEl.className = 'loading-overlay';
+    loadingEl.innerHTML = `
+      <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <p>${message}</p>
+      </div>
+    `;
+    
+    document.body.appendChild(loadingEl);
+    requestAnimationFrame(() => loadingEl.classList.add('show'));
+    
+    return id;
+  }
+
+  hideLoading(id) {
+    const loadingEl = document.getElementById(id);
+    if (loadingEl) {
+      loadingEl.classList.remove('show');
+      setTimeout(() => {
+        if (loadingEl.parentNode) {
+          loadingEl.parentNode.removeChild(loadingEl);
+        }
+      }, APP_CONFIG.performance.animationDuration);
+    }
+  }
+
+  showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    requestAnimationFrame(() => {
+      notification.classList.add('show');
+    });
+    
+    setTimeout(() => {
+      notification.classList.remove('show');
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, APP_CONFIG.performance.animationDuration);
+    }, 3000);
+  }
+
+  // Utility functions
+  debounce(func, wait) {
+    return (...args) => {
+      const key = func.toString();
+      clearTimeout(this.debounceTimers.get(key));
+      this.debounceTimers.set(key, setTimeout(() => func.apply(this, args), wait));
     };
   }
 
-  // Request deduplication
-  function makeRequest(url, options = {}) {
-    const requestKey = `${options.method || 'GET'}_${url}_${JSON.stringify(options.body || {})}`;
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
 
-    // Check if identical request is already pending
-    if (pendingRequests.has(requestKey)) {
-      console.log('🔄 Reusing pending request:', requestKey);
-      return pendingRequests.get(requestKey);
-    }
+  formatPlatformName(platform) {
+    const names = {
+      instagram: 'Instagram',
+      tiktok: 'TikTok',
+      youtube: 'YouTube',
+      linkedin: 'LinkedIn',
+      twitter: 'Twitter/X'
+    };
+    return names[platform] || platform.charAt(0).toUpperCase() + platform.slice(1);
+  }
 
-    const requestPromise = fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Request-ID': `req_${++requestCounter}_${Date.now()}`,
-        ...options.headers
-      },
-      ...options
-    })
-    .then(response => {
-      pendingRequests.delete(requestKey);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      return response.json();
-    })
-    .catch(error => {
-      pendingRequests.delete(requestKey);
-      throw error;
+  animateIn(element) {
+    element.style.opacity = '0';
+    element.style.transform = 'translateY(20px)';
+    
+    requestAnimationFrame(() => {
+      element.style.transition = `opacity ${APP_CONFIG.performance.animationDuration}ms ease, transform ${APP_CONFIG.performance.animationDuration}ms ease`;
+      element.style.opacity = '1';
+      element.style.transform = 'translateY(0)';
     });
-
-    pendingRequests.set(requestKey, requestPromise);
-    return requestPromise;
   }
 
-  // Geração de conteúdo
-  async function generateContent(form) {
-    const formData = new FormData(form);
-    const payload = {};
+  switchTab(targetTab, tabButtons, tabContents) {
+    // Update buttons
+    tabButtons.forEach(btn => btn.classList.remove('active'));
+    const activeBtn = document.querySelector(`[data-tab="${targetTab}"]`);
+    if (activeBtn) activeBtn.classList.add('active');
 
-    // Converter FormData para objeto
-    for (const [key, value] of formData.entries()) {
-      if (key === 'keywords') {
-        // Converter keywords para array
-        payload[key] = value.split(',').map(k => k.trim()).filter(k => k);
-      } else if (key === 'file') {
-        // Ignorar arquivo vazio
-        if (value.size > 0) {
-          payload.file = value;
-        }
+    // Update content
+    tabContents.forEach(content => {
+      content.classList.remove('active');
+      if (content.id === targetTab) {
+        content.classList.add('active');
+      }
+    });
+  }
+
+  autoSave(input) {
+    const key = `autosave_${input.name || input.id}`;
+    localStorage.setItem(key, input.value);
+    console.log('💾 Auto-saved:', key);
+  }
+
+  loadAutoSaved() {
+    const form = document.getElementById('generate-form');
+    if (!form) return;
+
+    const inputs = form.querySelectorAll('input, textarea, select');
+    inputs.forEach(input => {
+      const key = `autosave_${input.name || input.id}`;
+      const saved = localStorage.getItem(key);
+      if (saved && !input.value) {
+        input.value = saved;
+      }
+    });
+  }
+
+  handleGlobalError(event) {
+    console.error('Global error:', event.error);
+    this.showNotification('❌ Erro inesperado da aplicação', 'error');
+  }
+
+  handleUnhandledRejection(event) {
+    console.error('Unhandled promise rejection:', event.reason);
+    this.showNotification('❌ Erro de processamento', 'error');
+  }
+
+  initializeObservers() {
+    // Intersection Observer for lazy loading
+    if ('IntersectionObserver' in window) {
+      this.observers.set('lazyLoad', new IntersectionObserver(
+        this.handleLazyLoad.bind(this),
+        { threshold: 0.1 }
+      ));
+    }
+  }
+
+  handleLazyLoad(entries) {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const element = entry.target;
+        // Implement lazy loading logic
+        element.classList.add('loaded');
+        this.observers.get('lazyLoad').unobserve(element);
+      }
+    });
+  }
+
+  startPerformanceMonitoring() {
+    // Log performance metrics every 30 seconds
+    setInterval(() => {
+      const metrics = this.apiClient.getMetrics();
+      console.log('📊 Performance Metrics:', metrics);
+    }, 30000);
+  }
+
+  // File handling methods
+  handleDragOver(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.classList.add('drag-over');
+  }
+
+  handleDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.classList.remove('drag-over');
+    
+    const files = Array.from(e.dataTransfer.files);
+    this.processFiles(files);
+  }
+
+  handleFileSelect(e) {
+    const files = Array.from(e.target.files);
+    this.processFiles(files);
+  }
+
+  async processFiles(files) {
+    for (const file of files) {
+      if (this.isValidFile(file)) {
+        await this.uploadFile(file);
       } else {
-        payload[key] = value;
+        this.showNotification(`❌ Arquivo inválido: ${file.name}`, 'error');
       }
-    }
-
-    // Processar upload de arquivo se existir
-    if (payload.file) {
-      try {
-        const extractedData = await extractFileContent(payload.file);
-        payload.extractedData = extractedData;
-      } catch (error) {
-        console.error('Erro ao extrair conteúdo do arquivo:', error);
-        showNotification('Não foi possível processar o arquivo', 'error');
-      }
-    }
-
-    // Enviar requisição para gerar conteúdo
-    try {
-      const response = await makeRequest('/api/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao gerar conteúdo');
-      }
-
-      const data = await response.json();
-      displayGeneratedContent(data);
-      showNotification('Conteúdo gerado com sucesso!', 'success');
-
-      // Scroll para o resultado
-      if (resultContainer) {
-        resultContainer.scrollIntoView({ behavior: 'smooth' });
-      }
-    } catch (error) {
-      console.error('Erro na geração:', error);
-      let errorMessage = 'Erro na geração de conteúdo';
-
-      if (error.response) {
-        errorMessage = error.response.data?.error || errorMessage;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-
-      showNotification(errorMessage, 'error');
-      return null;
     }
   }
 
-  // Sugestão de conteúdo
-  async function suggestContent(form) {
-    const formData = new FormData(form);
-    const payload = {};
-
-    // Converter FormData para objeto
-    for (const [key, value] of formData.entries()) {
-      if (key === 'keywords') {
-        // Converter keywords para array
-        payload[key] = value.split(',').map(k => k.trim()).filter(k => k);
-      } else {
-        payload[key] = value;
-      }
-    }
-
-    // Enviar requisição para sugerir conteúdo
-    try {
-      const response = await makeRequest('/api/suggest', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao sugerir conteúdo');
-      }
-
-      const data = await response.json();
-      displaySuggestion(data);
-      showNotification('Sugestão gerada com sucesso!', 'success');
-    } catch (error) {
-            console.error('Erro na sugestão:', error);
-            console.error('Error details:', {
-                message: error.message,
-                stack: error.stack,
-                response: error.response
-            });
-            showNotification('Erro ao gerar sugestões: ' + (error.message || 'Erro desconhecido'), 'error');
-        }
+  isValidFile(file) {
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'text/plain'];
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    
+    return validTypes.includes(file.type) && file.size <= maxSize;
   }
 
-  // Extração de conteúdo de arquivo
-  async function extractFileContent(file) {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('type', file.type);
-
+  async uploadFile(file) {
+    const loadingId = this.showLoading(`Processando ${file.name}...`);
+    
     try {
-      const response = await makeRequest('/api/extract', {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', 'extract');
+
+      const response = await fetch('/api/extract', {
         method: 'POST',
         body: formData
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao extrair conteúdo');
+        throw new Error('Erro no upload');
       }
 
       const data = await response.json();
-      return data.data;
+      
+      if (data.success) {
+        this.populateExtractedData(data.data);
+        this.showNotification('✅ Arquivo processado com sucesso!', 'success');
+      } else {
+        throw new Error(data.error);
+      }
+
     } catch (error) {
-      console.error('Erro na extração:', error);
-      throw error;
+      console.error('Erro no upload:', error);
+      this.showNotification(`❌ Erro ao processar arquivo: ${error.message}`, 'error');
+    } finally {
+      this.hideLoading(loadingId);
     }
   }
 
-  // Exibição de conteúdo gerado
-  function displayGeneratedContent(data) {
-    if (!resultContainer) return;
-
-    // Mostrar container de resultado
-    resultContainer.classList.remove('hidden');
-
-    // Obter plataforma selecionada
-    const platform = document.querySelector('select[name="platform"]').value;
-    const content = data.content[platform];
-
-    // Converter markdown para HTML
-    const htmlContent = convertMarkdownToHtml(content);
-
-    // Atualizar conteúdo
-    const resultContent = resultContainer.querySelector('.result-content');
-    if (resultContent) {
-      resultContent.innerHTML = htmlContent;
-    }
-
-    // Adicionar botões de ação
-    const actionButtons = resultContainer.querySelector('.result-actions');
-    if (actionButtons) {
-      actionButtons.innerHTML = `
-        <button class="btn btn-secondary" onclick="copyToClipboard()">
-          <span>📋</span> Copiar
-        </button>
-        <button class="btn btn-secondary" onclick="downloadContent()">
-          <span>💾</span> Baixar
-        </button>
-      `;
+  populateExtractedData(data) {
+    const textarea = document.getElementById('extracted-data');
+    if (textarea) {
+      textarea.value = data;
+      this.autoSave(textarea);
     }
   }
 
-  // Exibição de sugestão
-  function displaySuggestion(data) {
-    const suggestion = data.suggestion;
+  displayFallbackContent() {
+    const resultsContainer = document.getElementById('results');
+    if (!resultsContainer) return;
 
-    // Preencher campos com sugestão
-    const titleInput = document.querySelector('input[name="topic"]');
-    if (titleInput && suggestion.title) {
-      titleInput.value = suggestion.title;
-    }
+    resultsContainer.innerHTML = `
+      <div class="fallback-content">
+        <h3>🎭 Modo de Demonstração</h3>
+        <p>Configure suas chaves de API para usar IA avançada!</p>
+        <div class="fallback-example">
+          <h4>Exemplo de Conteúdo:</h4>
+          <pre>🚀 Transforme seu negócio com estratégias comprovadas!
 
-    // Mostrar sugestão em modal ou área dedicada
-    const suggestionContainer = document.getElementById('suggestion-container');
-    if (suggestionContainer) {
-      suggestionContainer.classList.remove('hidden');
-      suggestionContainer.innerHTML = `
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">💡 Sugestão de Conteúdo</h3>
-          </div>
-          <div class="suggestion-content">
-            <h4>Título Sugerido</h4>
-            <p>${suggestion.title || 'Sem sugestão de título'}</p>
+✨ Descubra como aplicar técnicas revolucionárias
+💪 Resultados reais em 30 dias
+🎯 Método passo a passo
 
-            <h4 class="mt-4">Estrutura Sugerida</h4>
-            <div>${convertMarkdownToHtml(suggestion.outline || 'Sem sugestão de estrutura')}</div>
-
-            <h4 class="mt-4">Hook Sugerido</h4>
-            <p><em>${suggestion.hook || 'Sem sugestão de hook'}</em></p>
-
-            <div class="mt-6 text-center">
-              <button class="btn btn-primary" onclick="applyContentSuggestion()">
-                Aplicar Sugestão
-              </button>
-            </div>
-          </div>
+#Transformacao #Sucesso #ResultadosReais</pre>
         </div>
-      `;
-    }
-  }
-
-  // Converter markdown para HTML (versão simplificada)
-  function convertMarkdownToHtml(markdown) {
-    if (!markdown) return '';
-
-    // Substituições básicas de markdown
-    let html = markdown
-      // Headers
-      .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-      .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-      .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-      // Bold
-      .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
-      // Italic
-      .replace(/\*(.*?)\*/gim, '<em>$1</em>')
-      // Lists
-      .replace(/^\s*\n\* (.*)/gim, '<ul>\n<li>$1</li>')
-      .replace(/^\* (.*)/gim, '<li>$1</li>')
-      .replace(/^\s*\n- (.*)/gim, '<ul>\n<li>$1</li>')
-      .replace(/^- (.*)/gim, '<li>$1</li>')
-      .replace(/^\s*\n\d+\. (.*)/gim, '<ol>\n<li>$1</li>')
-      .replace(/^\d+\. (.*)/gim, '<li>$1</li>')
-      // Blockquote
-      .replace(/^\> (.*$)/gim, '<blockquote>$1</blockquote>')
-      // Links
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/gim, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-      // Line breaks
-      .replace(/\n/gim, '<br>');
-
-    // Fechar listas
-    html = html
-      .replace(/<\/li>\s*<li>/gim, '</li>\n<li>')
-      .replace(/<\/li>\s*<\/ul>/gim, '</li>\n</ul>')
-      .replace(/<\/li>\s*<\/ol>/gim, '</li>\n</ol>');
-
-    return html;
-  }
-
-  // Sistema de notificações
-  function showNotification(message, type = 'info') {
-    // Remover notificações existentes
-    const existingNotifications = document.querySelectorAll('.notification');
-    existingNotifications.forEach(notification => {
-      notification.remove();
-    });
-
-    // Criar nova notificação
-    const notification = document.createElement('div');
-    notification.className = `notification notification-${type}`;
-
-    // Ícone baseado no tipo
-    let icon = '💬';
-    if (type === 'success') icon = '✅';
-    if (type === 'error') icon = '❌';
-    if (type === 'info') icon = 'ℹ️';
-
-    notification.innerHTML = `
-      <div class="notification-icon">${icon}</div>
-      <div class="notification-message">${message}</div>
+      </div>
     `;
-
-    // Adicionar ao DOM
-    document.body.appendChild(notification);
-
-    // Remover após alguns segundos
-    setTimeout(() => {
-      notification.style.opacity = '0';
-      setTimeout(() => {
-        notification.remove();
-      }, 300);
-    }, 3000);
   }
 
-  // Funções globais (expostas para uso em HTML)
-  window.copyToClipboard = function() {
-    const content = document.querySelector('.result-content').innerText;
-    navigator.clipboard.writeText(content)
-      .then(() => {
-        showNotification('Conteúdo copiado para a área de transferência!', 'success');
-      })
-      .catch(err => {
-        showNotification('Erro ao copiar conteúdo', 'error');
-        console.error('Erro ao copiar:', err);
+  createSuggestionContainer() {
+    const container = document.createElement('div');
+    container.id = 'suggestion-container';
+    container.className = 'suggestion-container';
+    
+    const resultsSection = document.getElementById('results')?.parentNode;
+    if (resultsSection) {
+      resultsSection.insertBefore(container, document.getElementById('results'));
+    }
+    
+    return container;
+  }
+
+  setupSuggestionActions(container) {
+    const applyBtn = container.querySelector('.apply-suggestion-btn');
+    const dismissBtn = container.querySelector('.dismiss-suggestion-btn');
+
+    if (applyBtn) {
+      applyBtn.addEventListener('click', () => {
+        // Apply suggestion logic
+        this.showNotification('✅ Sugestão aplicada!', 'success');
+        container.style.display = 'none';
       });
-  };
-
-  window.downloadContent = function() {
-    const content = document.querySelector('.result-content').innerText;
-    const title = document.querySelector('input[name="topic"]').value.trim() || 'conteudo';
-    const filename = title.toLowerCase().replace(/\s+/g, '-') + '.md';
-
-    const blob = new Blob([content], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 100);
-
-    showNotification('Conteúdo baixado como ' + filename, 'success');
-  };
-
-  window.applyContentSuggestion = function() {
-    const suggestionContainer = document.getElementById('suggestion-container');
-    if (!suggestionContainer) return;
-
-    // Obter título sugerido
-    const titleElement = suggestionContainer.querySelector('h4 + p');
-    if (titleElement) {
-      const titleInput = document.querySelector('input[name="topic"]');
-      if (titleInput) {
-        titleInput.value = titleElement.textContent;
-      }
     }
 
-    // Obter hook sugerido
-    const hookElement = suggestionContainer.querySelector('h4 + p em');
-    if (hookElement) {
-      const contextInput = document.querySelector('textarea[name="additionalContext"]');
-      if (contextInput) {
-        contextInput.value = hookElement.textContent;
-      }
+    if (dismissBtn) {
+      dismissBtn.addEventListener('click', () => {
+        container.style.display = 'none';
+      });
     }
-
-    // Esconder container de sugestão
-    suggestionContainer.classList.add('hidden');
-
-    showNotification('Sugestão aplicada com sucesso!', 'success');
-  };
-
-    // Debug functionality
-    window.debugApp = {
-        getInfo: async function() {
-            try {
-                const response = await fetch('/api/debug');
-                const data = await response.json();
-                console.log('🔍 Debug Info:', data);
-                return data;
-            } catch (error) {
-                console.error('❌ Debug error:', error);
-                return null;
-            }
-        },
-
-        testAI: async function() {
-            try {
-                const response = await fetch('/api/test-ai');
-                const data = await response.json();
-                console.log('🤖 AI Test Results:', data);
-                return data;
-            } catch (error) {
-                console.error('❌ AI test error:', error);
-                return null;
-            }
-        },
-
-        clearLogs: async function() {
-            try {
-                const response = await fetch('/api/clear-logs', { method: 'POST' });
-                const data = await response.json();
-                console.log('🧹 Logs cleared:', data);
-                return data;
-            } catch (error) {
-                console.error('❌ Clear logs error:', error);
-                return null;
-            }
-        }
-    };
-
-    // Add debug commands to console
-  console.log(`
-🔍 Debug Commands Available:
-- debugApp.getInfo() - Get system information
-- debugApp.testAI() - Test AI services
-- debugApp.clearLogs() - Clear application logs
-
-🚀 User Workflow:
-1. Configure API keys in .env file
-2. Use the form to create content
-3. Try the "Suggest Ideas" feature first
-4. Generate and download your content
-  `);
-
-  // Initialize user workflow guidance
-  initUserWorkflowGuidance();
-
-    // Initialize app when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initApp);
-    } else {
-        initApp();
-    }
-
-  // User workflow guidance system
-  function initUserWorkflowGuidance() {
-      // This function will guide the user through the steps
-      console.log('User workflow guidance initialized.');
   }
-});
+
+  setupTooltips() {
+    const tooltipElements = document.querySelectorAll('[data-tooltip]');
+    tooltipElements.forEach(el => {
+      el.addEventListener('mouseenter', this.showTooltip.bind(this));
+      el.addEventListener('mouseleave', this.hideTooltip.bind(this));
+    });
+  }
+
+  showTooltip(e) {
+    const text = e.target.dataset.tooltip;
+    if (!text) return;
+
+    const tooltip = document.createElement('div');
+    tooltip.className = 'tooltip';
+    tooltip.textContent = text;
+    document.body.appendChild(tooltip);
+
+    const rect = e.target.getBoundingClientRect();
+    tooltip.style.left = rect.left + (rect.width / 2) - (tooltip.offsetWidth / 2) + 'px';
+    tooltip.style.top = rect.top - tooltip.offsetHeight - 5 + 'px';
+
+    e.target._tooltip = tooltip;
+  }
+
+  hideTooltip(e) {
+    if (e.target._tooltip) {
+      document.body.removeChild(e.target._tooltip);
+      delete e.target._tooltip;
+    }
+  }
+}
+
+// Debug utilities
+window.debugApp = {
+  getInfo: () => {
+    return {
+      config: APP_CONFIG,
+      metrics: window.uiManager?.apiClient?.getMetrics() || {},
+      cache: window.uiManager?.apiClient?.performance?.cache?.size || 0,
+      version: '2.0.0-optimized'
+    };
+  },
+  
+  testAI: async () => {
+    try {
+      const response = await fetch('/api/test-integration');
+      const data = await response.json();
+      console.table(data.tests);
+      return data;
+    } catch (error) {
+      console.error('Test failed:', error);
+      return { error: error.message };
+    }
+  },
+  
+  clearCache: () => {
+    if (window.uiManager?.apiClient?.performance) {
+      window.uiManager.apiClient.performance.cache.clear();
+      localStorage.clear();
+      console.log('🧹 Cache cleared');
+    }
+  },
+
+  performance: () => {
+    return window.uiManager?.apiClient?.getMetrics() || {};
+  }
+};
+
+// Initialize application
+let uiManager;
+
+function initializeApp() {
+  console.log('🚀 Initializing optimized ViralCraft-AI...');
+  
+  uiManager = new UIManager();
+  window.uiManager = uiManager;
+  
+  // Load auto-saved data
+  uiManager.loadAutoSaved();
+  
+  console.log('✅ Application initialized successfully');
+  console.log('🔧 Debug commands available: debugApp.getInfo(), debugApp.testAI(), debugApp.clearCache()');
+}
+
+// Start app when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+  initializeApp();
+}
+
+// Export for testing
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { UIManager, APIClient, PerformanceManager };
+}

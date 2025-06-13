@@ -1,6 +1,6 @@
+
 /**
- * AI Service - Robust integration with multiple AI providers
- * Implements fallbacks, retry logic, and error handling
+ * AI Service - Optimized with enhanced performance, caching, and error handling
  */
 
 const { OpenAI } = require('openai');
@@ -12,150 +12,163 @@ class AIService {
     this.openai = null;
     this.initialized = false;
     this.fallbackMode = false;
-    this.requestQueue = [];
+    this.requestCache = new Map();
     this.rateLimits = {
       openai: { requests: 0, resetTime: 0 }
+    };
+    this.metrics = {
+      totalRequests: 0,
+      successfulRequests: 0,
+      failedRequests: 0,
+      cacheHits: 0
     };
   }
 
   async initialize() {
-    console.log('🤖 Initializing OpenAI service...');
-    console.log('🔍 DEBUG: Environment check');
-    console.log('🔍 NODE_ENV:', process.env.NODE_ENV);
-    console.log('🔍 OpenAI key present:', !!process.env.OPENAI_API_KEY);
-    console.log('🔍 OpenAI key length:', process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.length : 0);
-    console.log('🔍 OpenAI key starts with sk-:', process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.startsWith('sk-') : false);
-
+    console.log('🤖 Initializing optimized AI service...');
+    
     try {
-      // Initialize OpenAI
-      if (process.env.OPENAI_API_KEY && 
-          process.env.OPENAI_API_KEY !== 'your_openai_api_key_here' &&
-          process.env.OPENAI_API_KEY.length > 20) {
-
-        console.log('🔧 Creating OpenAI client...');
+      if (this.isValidApiKey(process.env.OPENAI_API_KEY)) {
+        console.log('🔧 Creating optimized OpenAI client...');
         this.openai = new OpenAI({
           apiKey: process.env.OPENAI_API_KEY,
-          timeout: 30000, // 30 second timeout
-          maxRetries: 3
+          timeout: 30000,
+          maxRetries: 3,
+          defaultHeaders: {
+            'User-Agent': 'ViralCraft-AI/1.0'
+          }
         });
 
-        // Test OpenAI connection
-        console.log('🧪 Testing OpenAI connection...');
-        const testResult = await this.testOpenAI();
+        const testResult = await this.testConnection();
         if (testResult) {
-          console.log('✅ OpenAI service initialized and tested successfully');
+          console.log('✅ OpenAI service optimized and ready');
           this.fallbackMode = false;
-          global.openai = this.openai; // Set global reference
+          global.openai = this.openai;
         } else {
-          console.warn('⚠️ OpenAI service initialized but test failed, enabling fallback');
-          this.fallbackMode = true;
+          this.enableFallbackMode();
         }
       } else {
-        console.warn('⚠️ OpenAI API key not configured or invalid');
-        console.log('💡 Expected format: sk-... with at least 20 characters');
-        this.fallbackMode = true;
-      }
-
-      // Check if OpenAI service is available
-      if (!this.openai || this.fallbackMode) {
-        console.log('🎭 OpenAI not available, enabling fallback mode');
-        console.log('💡 Tip: Set a valid OPENAI_API_KEY in your environment variables');
-        console.log('📋 Available fallback features: mock responses, cached results');
-        this.fallbackMode = true;
-        global.openai = null;
+        this.enableFallbackMode();
       }
 
       this.initialized = true;
-      console.log(`🎯 AI Service Status: ${this.fallbackMode ? 'Fallback Mode' : 'OpenAI Active'}`);
-      return !!this.openai && !this.fallbackMode;
+      this.startMetricsCollection();
+      return !this.fallbackMode;
 
     } catch (error) {
-      console.error('❌ OpenAI service initialization failed:', error);
-      logger.error('OpenAI service initialization failed', error);
-      this.fallbackMode = true;
-      this.initialized = true;
-      global.openai = null;
+      console.error('❌ AI service initialization failed:', error.message);
+      this.enableFallbackMode();
       return false;
     }
   }
 
-  async testOpenAI() {
-    if (!this.openai) {
-      console.log('❌ OpenAI client not initialized');
-      return false;
-    }
+  isValidApiKey(key) {
+    return key && 
+           key !== 'your_openai_api_key_here' && 
+           key.length > 20 && 
+           key.startsWith('sk-');
+  }
+
+  enableFallbackMode() {
+    console.warn('⚠️ Enabling optimized fallback mode');
+    this.fallbackMode = true;
+    global.openai = null;
+  }
+
+  async testConnection() {
+    if (!this.openai) return false;
 
     try {
-      console.log('🔄 Testing OpenAI API connection...');
       const response = await this.openai.chat.completions.create({
         model: "gpt-3.5-turbo",
-        messages: [{ role: "user", content: "Test" }],
+        messages: [{ role: "user", content: "Test connection" }],
         max_tokens: 5
       });
 
-      console.log('✅ OpenAI API test successful');
-      console.log(`📊 Model used: ${response.model}`);
-      console.log(`🎯 Tokens used: ${response.usage?.total_tokens || 0}`);
+      console.log('✅ OpenAI connection verified');
       return true;
     } catch (error) {
-      console.error('❌ OpenAI test failed:', error.message);
-      console.error('🔍 Error details:', {
-        status: error.status,
-        type: error.type,
-        code: error.code
-      });
-
-      if (error.status === 401) {
-        console.error('🔑 Authentication failed - check your API key');
-      } else if (error.status === 429) {
-        console.error('⏱️ Rate limit exceeded - please wait');
-      } else if (error.status >= 500) {
-        console.error('🔧 OpenAI server error - try again later');
-      }
-
-      logger.warn('OpenAI test failed', error);
+      console.error('❌ Connection test failed:', error.message);
       return false;
     }
   }
 
   async generateContent(params) {
     const startTime = Date.now();
+    this.metrics.totalRequests++;
 
     try {
+      // Check cache first
+      const cacheKey = this.generateCacheKey(params);
+      const cached = this.getFromCache(cacheKey);
+      if (cached) {
+        this.metrics.cacheHits++;
+        console.log('⚡ Serving content from cache');
+        return cached;
+      }
+
+      let result;
       if (this.fallbackMode || !this.openai) {
-        return this.generateFallbackContent(params);
-      }
-
-      // Use OpenAI for content generation
-      if (this.isServiceAvailable('openai')) {
+        result = this.generateFallbackContent(params);
+      } else if (this.isServiceAvailable('openai')) {
         try {
-          const result = await this.generateWithOpenAI(params);
-          performanceService.recordAIRequest(Date.now() - startTime, result.tokensUsed, true);
-          return result;
+          result = await this.generateWithOpenAI(params);
+          this.cacheResult(cacheKey, result);
         } catch (error) {
-          logger.error('OpenAI generation failed', error);
-          this.updateRateLimit('openai', error);
+          logger.error('OpenAI generation failed, using fallback', error);
+          result = this.generateFallbackContent(params);
         }
+      } else {
+        result = this.generateFallbackContent(params);
       }
 
-      // OpenAI failed or unavailable, use fallback
-      logger.warn('OpenAI service failed, using fallback content');
-      return this.generateFallbackContent(params);
+      this.metrics.successfulRequests++;
+      performanceService.recordAIRequest(Date.now() - startTime, result.tokensUsed || 0, true);
+      return result;
 
     } catch (error) {
+      this.metrics.failedRequests++;
       performanceService.recordAIRequest(Date.now() - startTime, 0, false);
-      logger.error('AI content generation failed completely', error);
+      logger.error('Content generation failed', error);
       return this.generateFallbackContent(params);
     }
   }
 
+  generateCacheKey(params) {
+    const { topic, contentType, platform, tone, keywords } = params;
+    const keyString = `${topic}-${contentType}-${platform}-${tone}-${(keywords || []).join(',')}`;
+    return Buffer.from(keyString).toString('base64').slice(0, 32);
+  }
 
+  getFromCache(key) {
+    const cached = this.requestCache.get(key);
+    if (cached && Date.now() - cached.timestamp < 300000) { // 5 minutes TTL
+      return cached.data;
+    }
+    if (cached) {
+      this.requestCache.delete(key);
+    }
+    return null;
+  }
+
+  cacheResult(key, result) {
+    // Implement LRU cache with size limit
+    if (this.requestCache.size >= 50) {
+      const firstKey = this.requestCache.keys().next().value;
+      this.requestCache.delete(firstKey);
+    }
+    
+    this.requestCache.set(key, {
+      data: result,
+      timestamp: Date.now()
+    });
+  }
 
   async generateWithOpenAI(params) {
     const { topic, contentType, platform, tone, extractedData } = params;
 
-    const systemPrompt = this.buildSystemPrompt(contentType, platform, tone);
-    const userPrompt = this.buildUserPrompt(topic, extractedData, params);
+    const systemPrompt = this.buildOptimizedSystemPrompt(contentType, platform, tone);
+    const userPrompt = this.buildOptimizedUserPrompt(topic, extractedData, params);
 
     const response = await this.openai.chat.completions.create({
       model: "gpt-4",
@@ -164,105 +177,272 @@ class AIService {
         { role: "user", content: userPrompt }
       ],
       max_tokens: 3000,
-      temperature: 0.7
+      temperature: 0.7,
+      presence_penalty: 0.1,
+      frequency_penalty: 0.1
     });
 
     return {
       content: response.choices[0].message.content,
       provider: 'openai',
       model: 'gpt-4',
-      tokensUsed: response.usage?.total_tokens || 0
+      tokensUsed: response.usage?.total_tokens || 0,
+      cached: false
     };
   }
 
   generateFallbackContent(params) {
     const { topic, contentType, platform } = params;
 
-    const templates = {
+    const enhancedTemplates = {
       'instagram': {
-        'post': `🚀 ${topic} - O Guia Definitivo\n\n✨ Descubra os segredos que estão transformando ${topic}\n\n💡 3 dicas essenciais:\n• Foque no que realmente importa\n• Aplique o princípio 80/20\n• Meça seus resultados\n\n#${topic.replace(/\s+/g, '')} #ViralContent #Transformacao`,
-        'story': `${topic} 🔥\n\nO que você precisa saber HOJE!\n\n→ Swipe para descobrir`,
-        'reel': `${topic} em 30 segundos! ⏰\n\nSalve este post para não esquecer! 📌`
+        'post': this.generateInstagramPost(topic),
+        'story': this.generateInstagramStory(topic),
+        'reel': this.generateInstagramReel(topic)
       },
       'tiktok': {
-        'video': `POV: Você descobriu o segredo de ${topic} 🤯\n\n#${topic.replace(/\s+/g, '')} #viral #dica #fyp`,
-        'trend': `Testei ${topic} por 30 dias e isso aconteceu... 😱\n\nParte 1/3 👀`
+        'video': this.generateTikTokVideo(topic),
+        'trend': this.generateTikTokTrend(topic)
       },
       'youtube': {
-        'video': `${topic}: O Método Que Está Revolucionando Tudo!\n\n🎯 Neste vídeo você vai descobrir:\n• O segredo por trás de ${topic}\n• Como aplicar na prática\n• Resultados reais em 30 dias\n\n👆 Se inscreva e ative o sininho!`,
-        'short': `${topic} em 60 segundos! ⚡\n\nVocê não vai acreditar no resultado...`
+        'video': this.generateYouTubeVideo(topic),
+        'short': this.generateYouTubeShort(topic)
       }
     };
 
-    const content = templates[platform]?.[contentType] || 
-                   `# ${topic}\n\nConteúdo incrível sobre ${topic} está sendo gerado...\n\n✨ Configure suas chaves de API para conteúdo personalizado com IA!`;
+    const content = enhancedTemplates[platform]?.[contentType] || 
+                   this.generateGenericContent(topic);
 
     return {
       content,
       provider: 'fallback',
-      model: 'template',
-      tokensUsed: 0
+      model: 'optimized-template',
+      tokensUsed: 0,
+      cached: false
     };
   }
 
-  buildSystemPrompt(contentType, platform, tone) {
-    return `Você é um especialista em criação de conteúdo viral seguindo o template Soulclap.
+  generateInstagramPost(topic) {
+    const hooks = [
+      `🚀 ${topic} mudou minha vida em 30 dias`,
+      `💡 O segredo de ${topic} que ninguém conta`,
+      `⚡ Como dominar ${topic} em tempo recorde`
+    ];
+    
+    const hook = hooks[Math.floor(Math.random() * hooks.length)];
+    
+    return `${hook}
 
-DIRETRIZES PRINCIPAIS:
-- Use hooks irresistíveis e títulos magnéticos
-- Aplique o princípio 80/20 (20% dos insights geram 80% do valor)
-- Crie conteúdo emocional e conectivo
-- Use storytelling e exemplos práticos
-- Inclua CTAs estratégicos
-- Otimize para SEO e engajamento
+✨ Se você quer transformar sua relação com ${topic}, este post é para você!
 
-ESTRUTURA SOULCLAP:
-1. Título & Hook (curiosidade, surpresa ou questionamento)
-2. Resumo Simplificado (2-3 linhas com emojis)
-3. Glossário Acessível
-4. Texto principal com blocos didáticos
-5. Exemplos práticos e ferramentas
-6. Quiz ou enquete interativa
-7. CTA variado e envolvente
+💪 3 estratégias comprovadas:
+• Foque no essencial (princípio 80/20)
+• Pratique consistentemente 
+• Meça seus resultados
 
-Tom: ${tone || 'inspirador, acessível e transformador'}
-Plataforma: ${platform}
-Tipo: ${contentType}`;
+📈 Resultados em 30 dias:
+• Mais clareza e foco
+• Melhores resultados
+• Menos stress e ansiedade
+
+💬 Conta nos comentários: qual sua maior dificuldade com ${topic}?
+
+#${topic.replace(/\s+/g, '')} #TransformacaoPessoal #Resultado #Foco`;
   }
 
-  buildUserPrompt(topic, extractedData, params) {
-    const { keywords, additionalContext, suggestedTitle, suggestedContent } = params;
+  generateInstagramStory(topic) {
+    return `🔥 ${topic} em 60 segundos!
 
-    return `
-Tópico: ${suggestedTitle || topic}
-Palavras-chave: ${keywords?.join(', ') || ''}
-${extractedData ? `\nDados extraídos para usar como base:\n${extractedData}` : ''}
-${additionalContext ? `\nContexto adicional:\n${additionalContext}` : ''}
-${suggestedContent ? `\nDireção aprovada do conteúdo:\n${suggestedContent}` : ''}
+→ Deslize para descobrir o método
+→ Salve para não esquecer  
+→ Compartilhe com um amigo
 
-Crie conteúdo completo seguindo RIGOROSAMENTE o template Soulclap,
-incluindo todos os elementos para máximo engajamento e potencial viral.
-${suggestedTitle ? `Use o título aprovado: "${suggestedTitle}"` : ''}
-${suggestedContent ? 'Expanda a direção aprovada mantendo sua essência.' : ''}`;
+#${topic.replace(/\s+/g, '')} #DicaRapida`;
+  }
+
+  generateInstagramReel(topic) {
+    return `POV: Você descobriu o segredo de ${topic} 🤯
+
+*música trending*
+
+Antes: Lutando com ${topic} 😤
+Depois: Dominando ${topic} 💪
+
+O que mudou? Swipe para descobrir! →
+
+#${topic.replace(/\s+/g, '')} #Transformacao #ViralContent #Fyp`;
+  }
+
+  generateTikTokVideo(topic) {
+    return `Testei ${topic} por 30 dias e ISSO aconteceu... 😱
+
+Dia 1: Completamente perdido
+Dia 15: Começando a entender  
+Dia 30: RESULTADO INCRÍVEL!
+
+Quer saber o método exato? 
+Comenta "MÉTODO" que eu mando no direct! 📩
+
+#${topic.replace(/\s+/g, '')} #30DiasDesafio #TransformacaoReal #Fyp`;
+  }
+
+  generateTikTokTrend(topic) {
+    return `Tell me you're learning ${topic} without telling me you're learning ${topic}...
+
+*mostra resultados impressionantes*
+
+Parte 2? 👀
+
+#${topic.replace(/\s+/g, '')} #TellMeWithoutTellingMe #Trending #Viral`;
+  }
+
+  generateYouTubeVideo(topic) {
+    return `${topic}: O Método Que Está REVOLUCIONANDO Tudo! (Resultados em 30 Dias)
+
+🎯 NESTE VÍDEO VOCÊ VAI DESCOBRIR:
+• O sistema exato que usei para dominar ${topic}
+• Os 3 erros que 90% das pessoas cometem
+• Como aplicar isso na sua vida hoje mesmo
+• Resultados reais de quem aplicou o método
+
+⏰ TIMESTAMPS:
+00:00 - Introdução 
+02:30 - O Problema Principal
+05:15 - A Solução Revolucionária  
+08:40 - Como Aplicar (Passo a Passo)
+12:20 - Resultados Reais
+15:00 - Conclusão e Próximos Passos
+
+💰 RECURSOS MENCIONADOS:
+• Link da planilha gratuita (descrição)
+• Curso completo (link na descrição)  
+• Comunidade exclusiva (primeiro comentário)
+
+👆 SE ESTE VÍDEO TE AJUDOU:
+• Deixe seu LIKE 👍
+• INSCREVA-SE no canal 🔔
+• COMPARTILHE com quem precisa 📤
+
+💬 COMENTA AQUI: Qual sua maior dificuldade com ${topic}?
+
+#${topic.replace(/\s+/g, '')} #Tutorial #TransformacaoReal #ResultadosReais`;
+  }
+
+  generateYouTubeShort(topic) {
+    return `${topic} em 60 SEGUNDOS! ⚡
+
+A técnica que mudou TUDO:
+
+✅ Passo 1: [Fundamento]
+✅ Passo 2: [Ação]  
+✅ Passo 3: [Resultado]
+
+Resultado? TRANSFORMAÇÃO TOTAL! 🔥
+
+Quer o guia completo? Link na bio! 👆
+
+#${topic.replace(/\s+/g, '')} #Shorts #DicaRapida #Transformacao`;
+  }
+
+  generateGenericContent(topic) {
+    return `# Conteúdo Revolucionário: ${topic}
+
+🚀 **Descoberta que Vai Mudar Sua Perspectiva**
+
+Você está pronto para uma transformação real em ${topic}? 
+
+## ✨ O Que Você Vai Aprender:
+• Estratégias comprovadas e eficazes
+• Métodos que realmente funcionam  
+• Como aplicar na prática hoje mesmo
+
+## 💪 Resultados Esperados:
+• Maior clareza e foco
+• Melhores resultados em menos tempo
+• Confiança para alcançar seus objetivos
+
+## 🎯 Próximos Passos:
+1. Aplique as estratégias compartilhadas
+2. Acompanhe seus resultados
+3. Ajuste conforme necessário
+
+💡 **Configure suas chaves de API para conteúdo personalizado com IA!**
+
+---
+*Conteúdo otimizado para máximo engajamento e resultados reais.*`;
+  }
+
+  buildOptimizedSystemPrompt(contentType, platform, tone) {
+    return `Você é um especialista em criação de conteúdo viral otimizado para ${platform}.
+
+DIRETRIZES DE PERFORMANCE:
+- Hooks irresistíveis nos primeiros 3 segundos
+- Storytelling emocional e conectivo
+- Call-to-actions estratégicos para máximo engajamento
+- Otimização para algoritmos de ${platform}
+- Linguagem ${tone || 'inspiradora e acessível'}
+
+ESTRUTURA OTIMIZADA:
+1. Hook magnético (curiosidade/surpresa)
+2. Desenvolvimento envolvente com valor prático
+3. Exemplos concretos e aplicáveis
+4. CTA específico para ${platform}
+
+Tipo: ${contentType} | Plataforma: ${platform}`;
+  }
+
+  buildOptimizedUserPrompt(topic, extractedData, params) {
+    const { keywords, additionalContext } = params;
+
+    return `Tópico: ${topic}
+${keywords?.length ? `Palavras-chave: ${keywords.join(', ')}` : ''}
+${extractedData ? `\nBase de dados: ${extractedData}` : ''}
+${additionalContext ? `\nContexto: ${additionalContext}` : ''}
+
+Crie conteúdo otimizado para máximo engajamento e potencial viral.`;
   }
 
   isServiceAvailable(service) {
     const now = Date.now();
-    const rateLimit = this.rateLimits[service];
-
-    return now > rateLimit.resetTime;
+    return now > this.rateLimits[service].resetTime;
   }
 
-  updateRateLimit(service, error) {
-    if (error.status === 429) {
-      // Rate limited - wait 1 minute
-      this.rateLimits[service].resetTime = Date.now() + 60000;
-      logger.warn(`${service} rate limited, backing off for 1 minute`);
-    } else if (error.status >= 500) {
-      // Server error - wait 30 seconds
-      this.rateLimits[service].resetTime = Date.now() + 30000;
-      logger.warn(`${service} server error, backing off for 30 seconds`);
+  startMetricsCollection() {
+    // Clean cache every 10 minutes
+    setInterval(() => {
+      this.cleanCache();
+    }, 600000);
+
+    // Log metrics every 5 minutes  
+    setInterval(() => {
+      this.logMetrics();
+    }, 300000);
+  }
+
+  cleanCache() {
+    const now = Date.now();
+    for (const [key, value] of this.requestCache.entries()) {
+      if (now - value.timestamp > 300000) {
+        this.requestCache.delete(key);
+      }
     }
+  }
+
+  logMetrics() {
+    const hitRate = this.metrics.totalRequests > 0 ? 
+      (this.metrics.cacheHits / this.metrics.totalRequests * 100).toFixed(1) : 0;
+
+    console.log(`📊 AI Service Metrics: ${this.metrics.successfulRequests}/${this.metrics.totalRequests} successful, ${hitRate}% cache hit rate`);
+  }
+
+  getStatus() {
+    return {
+      initialized: this.initialized,
+      openai: !!this.openai,
+      fallbackMode: this.fallbackMode,
+      metrics: this.metrics,
+      cacheSize: this.requestCache.size
+    };
   }
 
   async generateImage(prompt, options = {}) {
@@ -271,31 +451,26 @@ ${suggestedContent ? 'Expanda a direção aprovada mantendo sua essência.' : ''
     }
 
     try {
+      const optimizedPrompt = `${prompt}, ${options.style || 'digital art, professional, high quality'}, trending, viral aesthetic`;
+      
       const response = await this.openai.images.generate({
         model: "dall-e-3",
-        prompt: `${prompt}, ${options.style || 'digital art'}, high quality, professional`,
+        prompt: optimizedPrompt,
         n: 1,
         size: options.size || "1024x1024",
-        quality: "hd"
+        quality: "hd",
+        style: options.artistic_style || "vivid"
       });
 
       return {
         imageUrl: response.data[0].url,
-        provider: 'openai'
+        provider: 'openai',
+        prompt: optimizedPrompt
       };
     } catch (error) {
       logger.error('Image generation failed', error);
       return { error: error.message };
     }
-  }
-
-  getStatus() {
-    return {
-      initialized: this.initialized,
-      openai: !!this.openai,
-      fallbackMode: this.fallbackMode,
-      rateLimits: this.rateLimits
-    };
   }
 }
 
