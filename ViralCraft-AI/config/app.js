@@ -45,7 +45,9 @@ module.exports = {
     port: process.env.PORT || 5000,
     host: '0.0.0.0',
     cors: {
-      origin: process.env.CORS_ORIGIN || '*',
+      // CSV of allowed origins, e.g. "https://app.viralcraft.ai,https://staging.viralcraft.ai".
+      // Defaults to "*" only in development; production should always set CORS_ORIGIN explicitly.
+      origin: process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production' ? '' : '*'),
       credentials: true
     }
   }

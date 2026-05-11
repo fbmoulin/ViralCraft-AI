@@ -31,12 +31,14 @@ class DatabaseService {
         }
       };
 
-      // Add SSL for PostgreSQL in production
+      // Add SSL for PostgreSQL in production. Strict by default (DB_SSL_STRICT=false to opt-out
+      // for self-signed certs in private networks — never disable when connecting over the internet).
       if (!isSqlite && process.env.NODE_ENV === 'production') {
+        const strict = (process.env.DB_SSL_STRICT || 'true').toLowerCase() !== 'false';
         options.dialectOptions = {
           ssl: {
             require: true,
-            rejectUnauthorized: false
+            rejectUnauthorized: strict
           }
         };
       }

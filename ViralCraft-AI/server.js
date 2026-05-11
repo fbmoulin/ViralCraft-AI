@@ -8,6 +8,7 @@ const multer = require('multer');
 const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
+const config = require('./config/app');
 const logger = require('./utils/logger');
 const { systemMonitoring, requestLogging, errorTracking, getHealthData } = require('./middleware/monitoring');
 
@@ -30,16 +31,50 @@ app.use(morgan(morganFormat, {
 app.use(systemMonitoring);
 app.use(requestLogging);
 
-// Security and compression middleware
-// Middleware
+// Security middleware — helmet with CSP enabled for production-grade defaults
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      'default-src': ["'self'"],
+      'script-src': ["'self'", "'unsafe-inline'", 'https://*.clerk.accounts.dev', 'https://*.clerk.com', 'https://js.stripe.com'],
+      'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      'font-src': ["'self'", 'https://fonts.gstatic.com', 'data:'],
+      'img-src': ["'self'", 'data:', 'https:', 'blob:'],
+      'connect-src': ["'self'", 'https://*.clerk.accounts.dev', 'https://*.clerk.com', 'https://api.stripe.com'],
+      'frame-src': ["'self'", 'https://js.stripe.com', 'https://hooks.stripe.com']
+    }
+  },
   crossOriginEmbedderPolicy: false
 }));
 app.use(compression());
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// CORS: whitelist explicit origins, no wildcard in production
+const corsOrigins = config.server.cors.origin === '*'
+  ? '*'
+  : config.server.cors.origin.split(',').map((o) => o.trim()).filter(Boolean);
+app.use(cors({
+  origin: corsOrigins,
+  credentials: config.server.cors.credentials
+}));
+
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
+
+// Rate limiters: stricter for AI-intensive routes
+const aiRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: parseInt(process.env.AI_RATE_LIMIT_PER_MIN || '20', 10),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many AI requests, please retry in a minute.' }
+});
+const readRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: parseInt(process.env.READ_RATE_LIMIT_PER_MIN || '100', 10),
+  standardHeaders: true,
+  legacyHeaders: false
+});
 // Serve static files with caching headers
 const staticOptions = {
   maxAge: process.env.NODE_ENV === 'production' ? '1y' : '1h',
@@ -66,9 +101,9 @@ const initializeAIServices = async () => {
   try {
     await aiService.initialize();
     global.aiService = aiService;
-    console.log('✅ AI services integration completed');
+    logger.info('AI services integration completed');
   } catch (error) {
-    console.error('❌ AI services initialization failed:', error.message);
+    logger.error('AI services initialization failed', error);
     global.aiService = aiService; // Still set it for fallback mode
   }
 };
@@ -78,9 +113,9 @@ initializeAIServices();
 
 // Configuração do Multer para upload de arquivos
 const storage = multer.memoryStorage();
-const upload = multer({ 
+const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'text/plain'];
     if (allowedTypes.includes(file.mimetype)) {
@@ -98,26 +133,25 @@ let Content;
 // Connect to Database using the database service
 const connectDB = async () => {
   try {
-    console.log('📊 Initializing database connection...');
+    logger.info('Initializing database connection...');
 
     // Use the database service
     const databaseService = require('./services/database');
     const connected = await databaseService.initialize();
 
     if (connected) {
-      console.log('✅ Database connected successfully');
+      logger.info('Database connected successfully');
 
       // Set global reference for routes
       global.db = databaseService;
 
       return true;
-    } else {
-      console.warn('⚠️ Database connection failed, running in memory mode');
-      return false;
     }
+    logger.warn('Database connection failed, running in memory mode');
+    return false;
   } catch (error) {
-    console.error('❌ Database connection error:', error.message);
-    console.warn('⚠️ Running without database');
+    logger.error('Database connection error', error);
+    logger.warn('Running without database');
     return false;
   }
 };
@@ -261,7 +295,7 @@ app.get('/api/health', apiCache(30000), async (req, res) => { // Cache for 30 se
 });
 
 // Extract data from files
-app.post('/api/extract', upload.single('file'), async (req, res) => {
+app.post('/api/extract', aiRateLimiter, upload.single('file'), async (req, res) => {
   try {
     const { type } = req.body;
     const file = req.file;
@@ -277,16 +311,16 @@ app.post('/api/extract', upload.single('file'), async (req, res) => {
     let extractedData = '';
 
     if (file.mimetype.startsWith('image/')) {
-      // Process image with OpenAI Vision
+      // Process image with OpenAI Vision (gpt-4o supports vision and replaces deprecated gpt-4-vision-preview)
       const base64Image = file.buffer.toString('base64');
       const response = await global.openai.chat.completions.create({
-        model: "gpt-4-vision-preview",
+        model: 'gpt-4o',
         messages: [
           {
-            role: "user",
+            role: 'user',
             content: [
-              { type: "text", text: "Extract all text from this image in a structured format:" },
-              { type: "image_url", image_url: { url: `data:${file.mimetype};base64,${base64Image}` } }
+              { type: 'text', text: 'Extract all text from this image in a structured format:' },
+              { type: 'image_url', image_url: { url: `data:${file.mimetype};base64,${base64Image}` } }
             ]
           }
         ],
@@ -303,13 +337,13 @@ app.post('/api/extract', upload.single('file'), async (req, res) => {
 
     res.json({ success: true, data: extractedData });
   } catch (error) {
-    console.error('Extraction error:', error);
-    res.status(500).json({ error: 'Error processing file', details: error.message });
+    logger.error('Extraction error', error);
+    res.status(500).json({ error: 'Error processing file' });
   }
 });
 
 // Generate content
-app.post('/api/generate', async (req, res) => {
+app.post('/api/generate', aiRateLimiter, async (req, res) => {
   try {
     const { 
       topic, 
@@ -356,25 +390,25 @@ app.post('/api/generate', async (req, res) => {
         });
       }
     } catch (dbError) {
-      console.error('Database error:', dbError);
+      logger.error('Database error while saving generated content', dbError);
       // Continue even with database error
     }
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       content: adaptedContent
     });
 
   } catch (error) {
-    console.error('Generation error:', error);
-    res.status(500).json({ error: 'Error generating content', details: error.message });
+    logger.error('Generation error', error);
+    res.status(500).json({ error: 'Error generating content' });
   }
 });
 
 // Fetch saved content
 
 // Suggest content (lightweight preview)
-app.post('/api/suggest', async (req, res) => {
+app.post('/api/suggest', aiRateLimiter, async (req, res) => {
   try {
     const { 
       topic, 
@@ -461,18 +495,18 @@ app.post('/api/suggest', async (req, res) => {
       suggestion.outline = outlineMatch ? outlineMatch[1].trim() : '';
       suggestion.hook = hookMatch ? hookMatch[1].trim() : '';
     } catch (parseError) {
-      console.warn('Error parsing suggestion:', parseError);
+      logger.warn('Error parsing suggestion', parseError);
       // Use raw content if parsing fails
     }
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       suggestion
     });
 
   } catch (error) {
-    console.error('Suggestion error:', error);
-    res.status(500).json({ error: 'Error generating suggestion', details: error.message });
+    logger.error('Suggestion error', error);
+    res.status(500).json({ error: 'Error generating suggestion' });
   }
 });
 
@@ -485,12 +519,13 @@ app.get('/api/content', async (req, res) => {
     const contents = await global.db.getContent();
     res.json({ success: true, contents });
   } catch (error) {
-    res.status(500).json({ error: 'Error fetching content', details: error.message });
+    logger.error('Error fetching content list', error);
+    res.status(500).json({ error: 'Error fetching content' });
   }
 });
 
 // Real-time error monitoring
-app.get('/api/errors/realtime', async (req, res) => {
+app.get('/api/errors/realtime', readRateLimiter, async (req, res) => {
   try {
     const healthData = getHealthData();
     const recentErrors = healthData.logs.lastErrors || [];
@@ -509,10 +544,10 @@ app.get('/api/errors/realtime', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error monitoring endpoint failed:', error);
+    logger.error('Error monitoring endpoint failed', error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: 'Error retrieving error metrics'
     });
   }
 });
@@ -529,7 +564,8 @@ app.get('/api/content/:id', async (req, res) => {
     }
     res.json({ success: true, content });
   } catch (error) {
-    res.status(500).json({ error: 'Error fetching content', details: error.message });
+    logger.error('Error fetching content by id', error);
+    res.status(500).json({ error: 'Error fetching content' });
   }
 });
 
@@ -545,12 +581,13 @@ app.put('/api/content/:id', async (req, res) => {
     }
     res.json({ success: true, content: updatedContent });
   } catch (error) {
-    res.status(500).json({ error: 'Error updating content', details: error.message });
+    logger.error('Error updating content', error);
+    res.status(500).json({ error: 'Error updating content' });
   }
 });
 
 // Generate image with DALL-E
-app.post('/api/generate-image', async (req, res) => {
+app.post('/api/generate-image', aiRateLimiter, async (req, res) => {
   try {
     const { prompt, style = 'digital art' } = req.body;
     if (!global.openai) {
@@ -563,13 +600,13 @@ app.post('/api/generate-image', async (req, res) => {
       size: "1024x1024",
       quality: "hd"
     });
-    res.json({ 
-      success: true, 
-      imageUrl: response.data[0].url 
+    res.json({
+      success: true,
+      imageUrl: response.data[0].url
     });
   } catch (error) {
-    console.error('Image generation error:', error);
-    res.status(500).json({ error: 'Error generating image', details: error.message });
+    logger.error('Image generation error', error);
+    res.status(500).json({ error: 'Error generating image' });
   }
 });
 
@@ -577,26 +614,26 @@ app.post('/api/generate-image', async (req, res) => {
 try {
   const youtubeRoutes = require('./routes/youtube-routes');
   app.use('/api/youtube', youtubeRoutes);
-  console.log('✅ YouTube routes initialized');
+  logger.info('YouTube routes initialized');
 } catch (error) {
-  console.error('❌ Error initializing YouTube routes:', error.message);
+  logger.error('Error initializing YouTube routes', error);
 }
 
 try {
   const logsRoutes = require('./routes/logs-routes');
   app.use('/api/logs', logsRoutes);
-  console.log('✅ Logs routes initialized');
+  logger.info('Logs routes initialized');
 } catch (error) {
-  console.error('❌ Error initializing logs routes:', error.message);
+  logger.error('Error initializing logs routes', error);
 }
 
 //Registering debug routes
 try {
   const debugRoutes = require('./routes/debug-routes');
   app.use('/api', debugRoutes);
-  console.log('✅ Debug routes initialized');
+  logger.info('Debug routes initialized');
 } catch (error) {
-  console.error('❌ Error initializing debug routes:', error.message);
+  logger.error('Error initializing debug routes', error);
 }
 
 // Default route - serve index.html
@@ -612,21 +649,18 @@ app.get('*', (req, res) => {
 // Request logging is already handled by morgan middleware above
 
 // Enhanced error handling middleware
+// eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  // Log error details
-  console.error('Server error:', err);
-  // Prepare error response
-  const errorResponse = { 
-    error: 'Server error',
-    message: err.message || 'Unknown error occurred'
+  logger.error('Server error', err);
+  const statusCode = err.statusCode || 500;
+  const errorResponse = {
+    error: statusCode >= 500 ? 'Internal server error' : (err.message || 'Bad request')
   };
-  // Add stack trace in development
+  // Only expose stack trace in development
   if (process.env.NODE_ENV === 'development') {
+    errorResponse.message = err.message;
     errorResponse.stack = err.stack;
   }
-  // Set appropriate status code
-  const statusCode = err.statusCode || 500;
-  // Send response
   res.status(statusCode).json(errorResponse);
 });
 
@@ -635,51 +669,50 @@ app.use(errorTracking);
 
 // Optimized server info logging
 const logServerInfo = (port, dbConnected) => {
-  const dbType = process.env.DATABASE_URL ? 
-    (process.env.DATABASE_URL.startsWith('sqlite:') ? 'SQLite' : 'PostgreSQL') : 
-    'SQLite';
+  const dbType = process.env.DATABASE_URL
+    ? (process.env.DATABASE_URL.startsWith('sqlite:') ? 'SQLite' : 'PostgreSQL')
+    : 'SQLite';
 
-  console.log('\n🚀 Viral Content Creator Server Started Successfully');
-  console.log(`📍 URL: http://0.0.0.0:${port}`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📊 Database: ${dbType} ${dbConnected ? '✅' : '❌'}`);
-  console.log(`🤖 AI Services: ${global.openai ? 'OpenAI ✅' : 'OpenAI ❌'} | ${global.anthropic ? 'Anthropic ✅' : 'Anthropic ❌'}`);
-  console.log(`💾 Cache: Enabled`);
-  console.log(`📈 Monitoring: Active`);
-  console.log('─'.repeat(50));
+  logger.info('Viral Content Creator server started', {
+    url: `http://0.0.0.0:${port}`,
+    environment: process.env.NODE_ENV || 'development',
+    database: { type: dbType, connected: dbConnected },
+    aiServices: { openai: !!global.openai, anthropic: !!global.anthropic },
+    cors: corsOrigins
+  });
 };
 
 // Optimized server startup with enhanced error handling
 const startServer = async () => {
   try {
-    console.log('🔧 Starting optimized server initialization...');
-    
+    logger.info('Starting server initialization');
+
     // Initialize services in parallel where possible
     const [dbConnected] = await Promise.all([
-      connectDB(),
-      // Add other async initialization here
+      connectDB()
     ]);
 
+    // Warn loudly if running PostgreSQL config but defaulting to SQLite in prod
+    if (process.env.NODE_ENV === 'production' && (!process.env.DATABASE_URL || process.env.DATABASE_URL.startsWith('sqlite:'))) {
+      logger.warn('Production environment using SQLite — use a managed PostgreSQL (e.g., Neon) for multi-user workloads');
+    }
+
     const port = process.env.PORT || 5000;
-    
-    // Enhanced port selection with better error handling
+
     const startServerOnPort = async (portToUse, maxRetries = 5) => {
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
           return await new Promise((resolve, reject) => {
             const server = app.listen(portToUse, '0.0.0.0', () => {
               logServerInfo(portToUse, dbConnected);
-              
-              // Setup graceful shutdown
               setupGracefulShutdown(server);
-              
               resolve(server);
             }).on('error', reject);
           });
         } catch (err) {
           if (err.code === 'EADDRINUSE' && attempt < maxRetries) {
             const nextPort = portToUse + attempt;
-            console.warn(`⚠️ Port ${portToUse} in use, trying port ${nextPort}...`);
+            logger.warn(`Port ${portToUse} in use, trying port ${nextPort}`);
             portToUse = nextPort;
           } else {
             throw err;
@@ -690,12 +723,9 @@ const startServer = async () => {
     };
 
     await startServerOnPort(port);
-    
+
   } catch (error) {
-    console.error('❌ Fatal error starting server:', error.message);
-    console.error('Stack trace:', error.stack);
-    
-    // Cleanup before exit
+    logger.error('Fatal error starting server', error);
     await gracefulCleanup();
     process.exit(1);
   }
@@ -704,17 +734,16 @@ const startServer = async () => {
 // Graceful shutdown handler
 function setupGracefulShutdown(server) {
   const gracefulShutdown = async (signal) => {
-    console.log(`\n🛑 Received ${signal}, starting graceful shutdown...`);
-    
+    logger.info(`Received ${signal}, starting graceful shutdown`);
+
     server.close(async () => {
-      console.log('🔌 HTTP server closed');
+      logger.info('HTTP server closed');
       await gracefulCleanup();
       process.exit(0);
     });
-    
-    // Force close after 30 seconds
+
     setTimeout(() => {
-      console.error('❌ Forced shutdown after timeout');
+      logger.error('Forced shutdown after timeout');
       process.exit(1);
     }, 30000);
   };
@@ -723,33 +752,26 @@ function setupGracefulShutdown(server) {
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
-// Cleanup function
 async function gracefulCleanup() {
-  console.log('🧹 Starting cleanup...');
-  
+  logger.info('Starting cleanup');
+
   try {
-    // Close database connections
     if (global.db && global.db.close) {
       await global.db.close();
-      console.log('📊 Database connections closed');
+      logger.info('Database connections closed');
     }
-    
-    // Clear any timers or intervals
-    if (global.performanceService) {
-      // Cleanup performance monitoring
-    }
-    
-    console.log('✅ Cleanup completed');
+
+    logger.info('Cleanup completed');
   } catch (error) {
-    console.error('❌ Error during cleanup:', error.message);
+    logger.error('Error during cleanup', error);
   }
 }
 
-// Start the server with debug logging
-console.log('🚀 Starting ViralCraft-AI server...');
-console.log('📍 Node.js version:', process.version);
-console.log('📍 Working directory:', process.cwd());
-console.log('📍 Environment:', process.env.NODE_ENV || 'development');
+logger.info('Starting ViralCraft-AI server', {
+  nodeVersion: process.version,
+  cwd: process.cwd(),
+  environment: process.env.NODE_ENV || 'development'
+});
 
 startServer();
 

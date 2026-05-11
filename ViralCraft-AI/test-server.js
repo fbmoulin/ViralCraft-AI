@@ -17,13 +17,17 @@ async function testServer() {
       console.log(`✅ ${test.name}: Status ${response.status}`);
       
       if (test.endpoint === '/api/health') {
-        console.log(`   Services: OpenAI ${response.data.services.openai.configured ? '✓' : '✗'}, Anthropic ${response.data.services.anthropic.configured ? '✓' : '✗'}`);
-        console.log(`   Database: ${response.data.services.database.connected ? 'Connected' : 'Not connected'} (${response.data.services.database.type})`);
+        const svc = response.data.services || {};
+        const openaiOk = svc.openai && svc.openai.configured;
+        const dbOk = svc.database && svc.database.connected;
+        const dbType = svc.database && svc.database.type ? svc.database.type : 'unknown';
+        console.log(`   OpenAI: ${openaiOk ? '✓' : '✗'}`);
+        console.log(`   Database: ${dbOk ? 'Connected' : 'Not connected'} (${dbType})`);
       }
     } catch (error) {
       console.log(`❌ ${test.name}: ${error.message}`);
     }
-    console.log('');le.log('');
+    console.log('');
   }
 
   // Test content generation (mock)
@@ -53,4 +57,4 @@ if (require.main === module) {
   testServer().catch(console.error);
 }
 
-module.exports = testServer;le.exports = testServer;
+module.exports = testServer;
