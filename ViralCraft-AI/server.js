@@ -105,6 +105,14 @@ try {
   logger.error('Error initializing Clerk webhook route', error);
 }
 
+try {
+  const stripeWebhookRouter = require('./routes/webhooks/stripe');
+  app.use('/api/webhooks/stripe', stripeWebhookRouter);
+  logger.info('Stripe webhook route initialized');
+} catch (error) {
+  logger.error('Error initializing Stripe webhook route', error);
+}
+
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
@@ -143,6 +151,9 @@ app.use('/static', express.static(path.join(__dirname, 'static'), staticOptions)
 // Initialize AI services and middleware
 const aiService = require('./services/ai');
 const apiCache = require('./middleware/apiCache');
+const { requireAuth } = require('./middleware/requireAuth');
+const { enforceQuota } = require('./middleware/enforceQuota');
+const quota = require('./services/quota');
 
 const initializeAIServices = async () => {
   try {
@@ -353,58 +364,73 @@ app.get('/api/health', apiCache(30000), async (req, res) => {
 });
 
 // Extract data from files
-app.post('/api/extract', aiRateLimiter, upload.single('file'), async (req, res) => {
-  try {
-    const { type } = req.body;
-    const file = req.file;
+app.post(
+  '/api/extract',
+  aiRateLimiter,
+  requireAuth,
+  enforceQuota(),
+  upload.single('file'),
+  async (req, res) => {
+    try {
+      const { type } = req.body;
+      const file = req.file;
 
-    if (!file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
+      if (!file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
 
-    if (!global.openai) {
-      return res.status(500).json({ error: 'OpenAI API not configured' });
-    }
+      if (!global.openai) {
+        return res.status(500).json({ error: 'OpenAI API not configured' });
+      }
 
-    let extractedData = '';
+      let extractedData = '';
 
-    if (file.mimetype.startsWith('image/')) {
-      // Process image with OpenAI Vision (gpt-4o supports vision and replaces deprecated gpt-4-vision-preview)
-      const base64Image = file.buffer.toString('base64');
-      const response = await global.openai.chat.completions.create({
+      if (file.mimetype.startsWith('image/')) {
+        // Process image with OpenAI Vision (gpt-4o supports vision and replaces deprecated gpt-4-vision-preview)
+        const base64Image = file.buffer.toString('base64');
+        const response = await global.openai.chat.completions.create({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: 'Extract all text from this image in a structured format:' },
+                {
+                  type: 'image_url',
+                  image_url: { url: `data:${file.mimetype};base64,${base64Image}` }
+                }
+              ]
+            }
+          ],
+          max_tokens: 1000
+        });
+        extractedData = response.choices[0].message.content;
+      } else if (file.mimetype === 'application/pdf') {
+        // Simulation of PDF processing
+        extractedData = 'Content extracted from PDF (simulation)';
+      } else {
+        // Process text
+        extractedData = file.buffer.toString('utf-8');
+      }
+
+      await quota.recordUsage({
+        userId: req.auth.clerkUserId,
+        orgId: req.auth.orgId || null,
+        endpoint: '/api/extract',
         model: 'gpt-4o',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: 'Extract all text from this image in a structured format:' },
-              {
-                type: 'image_url',
-                image_url: { url: `data:${file.mimetype};base64,${base64Image}` }
-              }
-            ]
-          }
-        ],
-        max_tokens: 1000
+        tokensIn: 0,
+        tokensOut: 0
       });
-      extractedData = response.choices[0].message.content;
-    } else if (file.mimetype === 'application/pdf') {
-      // Simulation of PDF processing
-      extractedData = 'Content extracted from PDF (simulation)';
-    } else {
-      // Process text
-      extractedData = file.buffer.toString('utf-8');
+      res.json({ success: true, data: extractedData });
+    } catch (error) {
+      logger.error('Extraction error', error);
+      res.status(500).json({ error: 'Error processing file' });
     }
-
-    res.json({ success: true, data: extractedData });
-  } catch (error) {
-    logger.error('Extraction error', error);
-    res.status(500).json({ error: 'Error processing file' });
   }
-});
+);
 
 // Generate content
-app.post('/api/generate', aiRateLimiter, async (req, res) => {
+app.post('/api/generate', aiRateLimiter, requireAuth, enforceQuota(), async (req, res) => {
   try {
     const {
       topic,
@@ -438,6 +464,8 @@ app.post('/api/generate', aiRateLimiter, async (req, res) => {
     try {
       if (global.db && global.db.isConnected) {
         await global.db.createContent({
+          userId: req.auth.clerkUserId,
+          orgId: req.auth.orgId || null,
           title: topic,
           type: contentType,
           platform: platform,
@@ -455,6 +483,15 @@ app.post('/api/generate', aiRateLimiter, async (req, res) => {
       // Continue even with database error
     }
 
+    await quota.recordUsage({
+      userId: req.auth.clerkUserId,
+      orgId: req.auth.orgId || null,
+      endpoint: '/api/generate',
+      model: global.openai ? 'gpt-4o' : 'mock',
+      tokensIn: result?.usage?.promptTokens || 0,
+      tokensOut: result?.usage?.completionTokens || 0
+    });
+
     res.json({
       success: true,
       content: adaptedContent
@@ -465,10 +502,8 @@ app.post('/api/generate', aiRateLimiter, async (req, res) => {
   }
 });
 
-// Fetch saved content
-
 // Suggest content (lightweight preview)
-app.post('/api/suggest', aiRateLimiter, async (req, res) => {
+app.post('/api/suggest', aiRateLimiter, requireAuth, enforceQuota(), async (req, res) => {
   try {
     const { topic, contentType, platform, keywords, tone, extractedData, additionalContext } =
       req.body;
@@ -553,6 +588,13 @@ app.post('/api/suggest', aiRateLimiter, async (req, res) => {
       // Use raw content if parsing fails
     }
 
+    await quota.recordUsage({
+      userId: req.auth.clerkUserId,
+      orgId: req.auth.orgId || null,
+      endpoint: '/api/suggest',
+      model: global.anthropic ? 'claude-3-haiku' : 'gpt-3.5-turbo'
+    });
+
     res.json({
       success: true,
       suggestion
@@ -592,28 +634,43 @@ app.get('/api/errors/realtime', readRateLimiter, async (req, res) => {
 });
 
 // Generate image with DALL-E
-app.post('/api/generate-image', aiRateLimiter, async (req, res) => {
-  try {
-    const { prompt, style = 'digital art' } = req.body;
-    if (!global.openai) {
-      return res.status(500).json({ error: 'OpenAI API not configured' });
+app.post(
+  '/api/generate-image',
+  aiRateLimiter,
+  requireAuth,
+  enforceQuota({ isImage: true }),
+  async (req, res) => {
+    try {
+      const { prompt, style = 'digital art' } = req.body;
+      if (!global.openai) {
+        return res.status(500).json({ error: 'OpenAI API not configured' });
+      }
+      const response = await global.openai.images.generate({
+        model: 'dall-e-3',
+        prompt: `${prompt}, style: ${style}, high quality, professional`,
+        n: 1,
+        size: '1024x1024',
+        quality: 'hd'
+      });
+
+      await quota.recordUsage({
+        userId: req.auth.clerkUserId,
+        orgId: req.auth.orgId || null,
+        endpoint: '/api/generate-image',
+        model: 'dall-e-3',
+        isImage: true
+      });
+
+      res.json({
+        success: true,
+        imageUrl: response.data[0].url
+      });
+    } catch (error) {
+      logger.error('Image generation error', error);
+      res.status(500).json({ error: 'Error generating image' });
     }
-    const response = await global.openai.images.generate({
-      model: 'dall-e-3',
-      prompt: `${prompt}, style: ${style}, high quality, professional`,
-      n: 1,
-      size: '1024x1024',
-      quality: 'hd'
-    });
-    res.json({
-      success: true,
-      imageUrl: response.data[0].url
-    });
-  } catch (error) {
-    logger.error('Image generation error', error);
-    res.status(500).json({ error: 'Error generating image' });
   }
-});
+);
 
 // Initialize routes with error handling
 try {
@@ -630,6 +687,14 @@ try {
   logger.info('Org routes initialized');
 } catch (error) {
   logger.error('Error initializing Org routes', error);
+}
+
+try {
+  const billingRoutes = require('./routes/billingRoutes');
+  app.use('/api/billing', billingRoutes);
+  logger.info('Billing routes initialized');
+} catch (error) {
+  logger.error('Error initializing Billing routes', error);
 }
 
 try {

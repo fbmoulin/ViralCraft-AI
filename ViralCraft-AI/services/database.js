@@ -399,6 +399,172 @@ class DatabaseService {
       foreignKey: 'ownerId',
       as: 'ownedOrganizations'
     });
+
+    // ─── Billing schema (Sprint 5) ─────────────────────────────────────
+    this.models.Plan = this.sequelize.define(
+      'Plan',
+      {
+        id: {
+          type: DataTypes.STRING,
+          primaryKey: true
+        },
+        name: { type: DataTypes.STRING, allowNull: false },
+        stripePriceId: { type: DataTypes.STRING, allowNull: true },
+        monthlyAiCalls: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+        imageGenerations: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+        maxOrgMembers: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+        priceCents: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+        features: {
+          type: isSqlite ? DataTypes.TEXT : DataTypes.JSONB,
+          allowNull: true,
+          get() {
+            const value = this.getDataValue('features');
+            return typeof value === 'string' ? JSON.parse(value) : value;
+          },
+          set(value) {
+            this.setDataValue('features', isSqlite ? JSON.stringify(value) : value);
+          }
+        }
+      },
+      { timestamps: false }
+    );
+
+    this.models.Subscription = this.sequelize.define(
+      'Subscription',
+      {
+        id: {
+          type: DataTypes.UUID,
+          defaultValue: DataTypes.UUIDV4,
+          primaryKey: true
+        },
+        userId: {
+          type: DataTypes.UUID,
+          allowNull: true,
+          references: { model: this.models.User, key: 'id' }
+        },
+        orgId: {
+          type: DataTypes.UUID,
+          allowNull: true,
+          references: { model: this.models.Organization, key: 'id' }
+        },
+        planId: {
+          type: DataTypes.STRING,
+          allowNull: false,
+          references: { model: this.models.Plan, key: 'id' }
+        },
+        stripeCustomerId: { type: DataTypes.STRING, allowNull: true },
+        stripeSubscriptionId: { type: DataTypes.STRING, allowNull: true, unique: true },
+        status: {
+          type: DataTypes.ENUM('active', 'past_due', 'canceled', 'trialing', 'incomplete'),
+          allowNull: false,
+          defaultValue: 'active'
+        },
+        currentPeriodEnd: { type: DataTypes.DATE, allowNull: true }
+      },
+      {
+        indexes: [{ fields: ['userId'] }, { fields: ['orgId'] }, { fields: ['stripeCustomerId'] }]
+      }
+    );
+
+    this.models.ApiUsage = this.sequelize.define(
+      'ApiUsage',
+      {
+        id: {
+          type: DataTypes.UUID,
+          defaultValue: DataTypes.UUIDV4,
+          primaryKey: true
+        },
+        userId: {
+          type: DataTypes.STRING,
+          allowNull: false
+        },
+        orgId: {
+          type: DataTypes.STRING,
+          allowNull: true
+        },
+        endpoint: { type: DataTypes.STRING, allowNull: false },
+        model: { type: DataTypes.STRING, allowNull: true },
+        tokensIn: { type: DataTypes.INTEGER, defaultValue: 0 },
+        tokensOut: { type: DataTypes.INTEGER, defaultValue: 0 },
+        costUsd: { type: DataTypes.DECIMAL(10, 6), defaultValue: 0 },
+        isImage: { type: DataTypes.BOOLEAN, defaultValue: false }
+      },
+      {
+        indexes: [{ fields: ['userId', 'createdAt'] }, { fields: ['orgId', 'createdAt'] }]
+      }
+    );
+
+    this.models.Plan.hasMany(this.models.Subscription, {
+      foreignKey: 'planId',
+      as: 'subscriptions'
+    });
+    this.models.Subscription.belongsTo(this.models.Plan, { foreignKey: 'planId', as: 'plan' });
+    this.models.User.hasMany(this.models.Subscription, {
+      foreignKey: 'userId',
+      as: 'subscriptions'
+    });
+    this.models.Organization.hasMany(this.models.Subscription, {
+      foreignKey: 'orgId',
+      as: 'subscriptions'
+    });
+  }
+
+  // ─── Billing helpers (Sprint 5) ────────────────────────────────────
+  async upsertPlan(plan) {
+    if (!this.isConnected) return null;
+    const [row] = await this.models.Plan.upsert(plan, { returning: true });
+    return row.toJSON();
+  }
+
+  async getPlan(planId) {
+    if (!this.isConnected) return null;
+    const row = await this.models.Plan.findByPk(planId);
+    return row ? row.toJSON() : null;
+  }
+
+  async listPlans() {
+    if (!this.isConnected) return [];
+    const rows = await this.models.Plan.findAll({ order: [['priceCents', 'ASC']] });
+    return rows.map((r) => r.toJSON());
+  }
+
+  async findActiveSubscription({ userId, orgId }) {
+    if (!this.isConnected) return null;
+    const where = orgId ? { orgId } : { userId };
+    where.status = ['active', 'trialing', 'past_due'];
+    const sub = await this.models.Subscription.findOne({
+      where,
+      include: [{ model: this.models.Plan, as: 'plan' }],
+      order: [['updatedAt', 'DESC']]
+    });
+    return sub ? sub.toJSON() : null;
+  }
+
+  async upsertSubscription({ stripeSubscriptionId, ...rest }) {
+    if (!this.isConnected) return null;
+    const existing = stripeSubscriptionId
+      ? await this.models.Subscription.findOne({ where: { stripeSubscriptionId } })
+      : null;
+    if (existing) {
+      await existing.update(rest);
+      return existing.toJSON();
+    }
+    const created = await this.models.Subscription.create({ stripeSubscriptionId, ...rest });
+    return created.toJSON();
+  }
+
+  async recordApiUsage(usage) {
+    if (!this.isConnected) return null;
+    const row = await this.models.ApiUsage.create(usage);
+    return row.toJSON();
+  }
+
+  async countApiUsage({ userId, orgId, since, isImage = false }) {
+    if (!this.isConnected) return 0;
+    const where = orgId ? { orgId } : { userId };
+    if (since) where.createdAt = { [this.sequelize.constructor.Op.gte]: since };
+    where.isImage = isImage;
+    return this.models.ApiUsage.count({ where });
   }
 
   // ─── User / Organization helpers (Sprint 4) ────────────────────────
