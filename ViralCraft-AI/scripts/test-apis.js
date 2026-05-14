@@ -1,10 +1,10 @@
-
 const axios = require('axios');
 
 async function testAPIIntegration() {
-  const baseURL = process.env.NODE_ENV === 'production' 
-    ? 'https://your-repl-url.replit.app' 
-    : 'http://localhost:5000';
+  const baseURL =
+    process.env.NODE_ENV === 'production'
+      ? 'https://your-repl-url.replit.app'
+      : 'http://localhost:5000';
 
   console.log('🧪 Testing API Integration...\n');
 
@@ -41,7 +41,7 @@ async function testAPIIntegration() {
   for (const test of tests) {
     try {
       console.log(`Testing ${test.name}...`);
-      
+
       const config = {
         method: test.method,
         url: `${baseURL}${test.endpoint}`,
@@ -54,9 +54,9 @@ async function testAPIIntegration() {
       }
 
       const response = await axios(config);
-      
+
       console.log(`✅ ${test.name}: ${response.status} ${response.statusText}`);
-      
+
       if (test.endpoint === '/api/test-integration') {
         const { tests: integrationTests } = response.data;
         Object.entries(integrationTests).forEach(([service, result]) => {
@@ -64,7 +64,6 @@ async function testAPIIntegration() {
           console.log(`   ${icon} ${service}: ${result.details}`);
         });
       }
-      
     } catch (error) {
       console.error(`❌ ${test.name}: ${error.message}`);
       if (error.response) {

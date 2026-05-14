@@ -1,0 +1,8 @@
+node_modules/
+logs/
+coverage/
+static/js/*.min.js
+static/css/*.min.css
+*.sqlite
+*.db
+package-lock.json

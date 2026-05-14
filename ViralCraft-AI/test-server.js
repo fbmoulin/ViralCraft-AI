@@ -1,4 +1,3 @@
-
 const axios = require('axios');
 
 async function testServer() {
@@ -15,7 +14,7 @@ async function testServer() {
       console.log(`Testing: ${test.name}`);
       const response = await axios.get(`${baseUrl}${test.endpoint}`, { timeout: 5000 });
       console.log(`✅ ${test.name}: Status ${response.status}`);
-      
+
       if (test.endpoint === '/api/health') {
         const svc = response.data.services || {};
         const openaiOk = svc.openai && svc.openai.configured;
@@ -33,13 +32,17 @@ async function testServer() {
   // Test content generation (mock)
   try {
     console.log('Testing: Content Generation (Demo)');
-    const response = await axios.post(`${baseUrl}/api/generate`, {
-      topic: 'Test Topic',
-      contentType: 'social',
-      platform: 'instagram',
-      tone: 'friendly'
-    }, { timeout: 10000 });
-    
+    const response = await axios.post(
+      `${baseUrl}/api/generate`,
+      {
+        topic: 'Test Topic',
+        contentType: 'social',
+        platform: 'instagram',
+        tone: 'friendly'
+      },
+      { timeout: 10000 }
+    );
+
     if (response.data.success) {
       console.log('✅ Content Generation: Working');
     } else {

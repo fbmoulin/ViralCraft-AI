@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+ViralCraft-AI/node_modules/
+
+# Logs
+logs/
+*.log
+ViralCraft-AI/logs/
+*-audit.json
+
+# Test coverage
+coverage/
+ViralCraft-AI/coverage/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+dist/
+build/
+
+# Cache
+.npm/
+.eslintcache
+
+# Husky bootstrap
+.husky/_/

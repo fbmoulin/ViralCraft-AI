@@ -3,6 +3,7 @@
 ## Resumo das Otimizações Implementadas
 
 ### 1. Implementação de Cache para Requisições Frequentes
+
 - **Arquivos modificados**: `services/ai.js`
 - **Implementações**:
   - Cache em memória com NodeCache para respostas de IA
@@ -12,6 +13,7 @@
   - Métricas de hit/miss para monitoramento
 
 ### 2. Otimização de Conexões de Banco de Dados
+
 - **Arquivos modificados**: `services/database.js`
 - **Implementações**:
   - Fallback automático para SQLite quando PostgreSQL falha
@@ -21,6 +23,7 @@
   - Conexão persistente com retry automático
 
 ### 3. Melhoria no Tratamento de Erros
+
 - **Arquivos modificados**: `services/ai.js`, `services/database.js`
 - **Implementações**:
   - Tratamento centralizado de erros com mensagens específicas
@@ -32,29 +35,33 @@
 ## Métricas de Performance
 
 ### Serviço de IA
-| Métrica | Antes | Depois | Melhoria |
-|---------|-------|--------|----------|
-| Tempo médio de resposta | 2.8s | 1.2s | 57.1% |
-| Taxa de erros | 18% | 4% | 77.8% |
-| Uso de memória | 245MB | 180MB | 26.5% |
-| Cache hit rate | 0% | 65% | N/A |
+
+| Métrica                 | Antes | Depois | Melhoria |
+| ----------------------- | ----- | ------ | -------- |
+| Tempo médio de resposta | 2.8s  | 1.2s   | 57.1%    |
+| Taxa de erros           | 18%   | 4%     | 77.8%    |
+| Uso de memória          | 245MB | 180MB  | 26.5%    |
+| Cache hit rate          | 0%    | 65%    | N/A      |
 
 ### Banco de Dados
-| Métrica | Antes | Depois | Melhoria |
-|---------|-------|--------|----------|
-| Tempo médio de query | 180ms | 75ms | 58.3% |
-| Conexões simultâneas | 5 | 20 | 300% |
-| Taxa de falha de conexão | 12% | 2% | 83.3% |
-| Disponibilidade | 94% | 99.5% | 5.9% |
+
+| Métrica                  | Antes | Depois | Melhoria |
+| ------------------------ | ----- | ------ | -------- |
+| Tempo médio de query     | 180ms | 75ms   | 58.3%    |
+| Conexões simultâneas     | 5     | 20     | 300%     |
+| Taxa de falha de conexão | 12%   | 2%     | 83.3%    |
+| Disponibilidade          | 94%   | 99.5%  | 5.9%     |
 
 ## Testes Realizados
 
 ### Testes de Carga
+
 - 50 requisições simultâneas ao endpoint `/api/generate`
 - 100 requisições simultâneas ao endpoint `/api/health`
 - Teste de recuperação após falha de conexão com banco de dados
 
 ### Testes de Resiliência
+
 - Simulação de falha na API OpenAI
 - Simulação de falha na API Anthropic
 - Simulação de falha no banco de dados PostgreSQL
@@ -62,16 +69,19 @@
 ## Observações e Recomendações
 
 ### Pontos Fortes
+
 1. O sistema de cache reduziu significativamente o tempo de resposta para requisições repetidas
 2. O fallback automático entre serviços de IA garante alta disponibilidade
 3. A recuperação automática de falhas de banco de dados elimina interrupções de serviço
 
 ### Pontos de Atenção
+
 1. O cache em memória pode crescer excessivamente em produção - considerar implementar limites de tamanho
 2. O modo de demonstração precisa ser claramente indicado na interface
 3. As métricas de performance precisam ser expostas via API para monitoramento
 
 ### Próximos Passos
+
 1. Implementar limites de tamanho para o cache em memória
 2. Adicionar mais métricas para monitoramento em tempo real
 3. Considerar implementação de cache distribuído para ambientes multi-instância

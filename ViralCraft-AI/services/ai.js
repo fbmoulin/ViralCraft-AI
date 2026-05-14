@@ -1,4 +1,3 @@
-
 /**
  * AI Service - Optimized with enhanced performance, caching, and error handling
  */
@@ -26,7 +25,7 @@ class AIService {
 
   async initialize() {
     console.log('🤖 Initializing optimized AI service...');
-    
+
     try {
       if (this.isValidApiKey(process.env.OPENAI_API_KEY)) {
         console.log('🔧 Creating optimized OpenAI client...');
@@ -54,7 +53,6 @@ class AIService {
       this.initialized = true;
       this.startMetricsCollection();
       return !this.fallbackMode;
-
     } catch (error) {
       console.error('❌ AI service initialization failed:', error.message);
       this.enableFallbackMode();
@@ -63,10 +61,7 @@ class AIService {
   }
 
   isValidApiKey(key) {
-    return key && 
-           key !== 'your_openai_api_key_here' && 
-           key.length > 20 && 
-           key.startsWith('sk-');
+    return key && key !== 'your_openai_api_key_here' && key.length > 20 && key.startsWith('sk-');
   }
 
   enableFallbackMode() {
@@ -80,8 +75,8 @@ class AIService {
 
     try {
       const response = await this.openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [{ role: "user", content: "Test connection" }],
+        model: 'gpt-3.5-turbo',
+        messages: [{ role: 'user', content: 'Test connection' }],
         max_tokens: 5
       });
 
@@ -125,7 +120,6 @@ class AIService {
       this.metrics.successfulRequests++;
       performanceService.recordAIRequest(Date.now() - startTime, result.tokensUsed || 0, true);
       return result;
-
     } catch (error) {
       this.metrics.failedRequests++;
       performanceService.recordAIRequest(Date.now() - startTime, 0, false);
@@ -142,7 +136,8 @@ class AIService {
 
   getFromCache(key) {
     const cached = this.requestCache.get(key);
-    if (cached && Date.now() - cached.timestamp < 300000) { // 5 minutes TTL
+    if (cached && Date.now() - cached.timestamp < 300000) {
+      // 5 minutes TTL
       return cached.data;
     }
     if (cached) {
@@ -157,7 +152,7 @@ class AIService {
       const firstKey = this.requestCache.keys().next().value;
       this.requestCache.delete(firstKey);
     }
-    
+
     this.requestCache.set(key, {
       data: result,
       timestamp: Date.now()
@@ -171,10 +166,10 @@ class AIService {
     const userPrompt = this.buildOptimizedUserPrompt(topic, extractedData, params);
 
     const response = await this.openai.chat.completions.create({
-      model: "gpt-4",
+      model: 'gpt-4',
       messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
       ],
       max_tokens: 3000,
       temperature: 0.7,
@@ -195,23 +190,23 @@ class AIService {
     const { topic, contentType, platform } = params;
 
     const enhancedTemplates = {
-      'instagram': {
-        'post': this.generateInstagramPost(topic),
-        'story': this.generateInstagramStory(topic),
-        'reel': this.generateInstagramReel(topic)
+      instagram: {
+        post: this.generateInstagramPost(topic),
+        story: this.generateInstagramStory(topic),
+        reel: this.generateInstagramReel(topic)
       },
-      'tiktok': {
-        'video': this.generateTikTokVideo(topic),
-        'trend': this.generateTikTokTrend(topic)
+      tiktok: {
+        video: this.generateTikTokVideo(topic),
+        trend: this.generateTikTokTrend(topic)
       },
-      'youtube': {
-        'video': this.generateYouTubeVideo(topic),
-        'short': this.generateYouTubeShort(topic)
+      youtube: {
+        video: this.generateYouTubeVideo(topic),
+        short: this.generateYouTubeShort(topic)
       }
     };
 
-    const content = enhancedTemplates[platform]?.[contentType] || 
-                   this.generateGenericContent(topic);
+    const content =
+      enhancedTemplates[platform]?.[contentType] || this.generateGenericContent(topic);
 
     return {
       content,
@@ -228,9 +223,9 @@ class AIService {
       `💡 O segredo de ${topic} que ninguém conta`,
       `⚡ Como dominar ${topic} em tempo recorde`
     ];
-    
+
     const hook = hooks[Math.floor(Math.random() * hooks.length)];
-    
+
     return `${hook}
 
 ✨ Se você quer transformar sua relação com ${topic}, este post é para você!
@@ -413,7 +408,7 @@ Crie conteúdo otimizado para máximo engajamento e potencial viral.`;
       this.cleanCache();
     }, 600000);
 
-    // Log metrics every 5 minutes  
+    // Log metrics every 5 minutes
     setInterval(() => {
       this.logMetrics();
     }, 300000);
@@ -429,10 +424,14 @@ Crie conteúdo otimizado para máximo engajamento e potencial viral.`;
   }
 
   logMetrics() {
-    const hitRate = this.metrics.totalRequests > 0 ? 
-      (this.metrics.cacheHits / this.metrics.totalRequests * 100).toFixed(1) : 0;
+    const hitRate =
+      this.metrics.totalRequests > 0
+        ? ((this.metrics.cacheHits / this.metrics.totalRequests) * 100).toFixed(1)
+        : 0;
 
-    console.log(`📊 AI Service Metrics: ${this.metrics.successfulRequests}/${this.metrics.totalRequests} successful, ${hitRate}% cache hit rate`);
+    console.log(
+      `📊 AI Service Metrics: ${this.metrics.successfulRequests}/${this.metrics.totalRequests} successful, ${hitRate}% cache hit rate`
+    );
   }
 
   getStatus() {
@@ -452,14 +451,14 @@ Crie conteúdo otimizado para máximo engajamento e potencial viral.`;
 
     try {
       const optimizedPrompt = `${prompt}, ${options.style || 'digital art, professional, high quality'}, trending, viral aesthetic`;
-      
+
       const response = await this.openai.images.generate({
-        model: "dall-e-3",
+        model: 'dall-e-3',
         prompt: optimizedPrompt,
         n: 1,
-        size: options.size || "1024x1024",
-        quality: "hd",
-        style: options.artistic_style || "vivid"
+        size: options.size || '1024x1024',
+        quality: 'hd',
+        style: options.artistic_style || 'vivid'
       });
 
       return {

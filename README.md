@@ -1,126 +1,114 @@
+# ViralCraft-AI
 
----
+> Multi-platform viral content generation with AI. Backend in Node.js + Express, frontend in vanilla JS, OpenAI-powered with graceful fallback.
 
-<p align="center">
-  <img src="https://svgshare.com/i/16y4.svg" alt="ViralCraft-AI Banner" width="600"/>
-</p>
+[![CI](https://github.com/fbmoulin/ViralCraft-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/fbmoulin/ViralCraft-AI/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-# 🚀 ViralCraft-AI
+## What it does
 
-> **Unleash Viral Creativity with AI!**  
-> Build, automate, and amplify your digital content with the power of intelligent web technology.
+ViralCraft-AI generates platform-tailored viral content (Instagram, TikTok, YouTube, X/Twitter, LinkedIn, Facebook) across post / reel / story / short / thread / article formats. It scores content for virality, analyzes sentiment, and offers optimization suggestions before you publish.
 
----
+## Stack
 
-## ✨ Features
+- **Runtime**: Node.js ≥ 18
+- **Web**: Express 4, helmet, express-rate-limit, morgan
+- **Persistence**: Sequelize ORM (SQLite default for dev, PostgreSQL for prod — Neon recommended)
+- **AI**: OpenAI (`gpt-4o`, `gpt-3.5-turbo`, DALL·E 3) with deterministic fallback templates
+- **Cache**: in-memory today; `ioredis` for distributed cache (Sprint 3)
+- **Logging**: Winston with daily-rotating files + structured JSON
+- **Frontend**: HTML + CSS + vanilla JavaScript (no framework)
+- **Quality**: ESLint + Prettier + Husky + Jest + GitHub Actions
 
-- 🤖 **AI-Powered Content Creation:** Generate and optimize digital content using smart algorithms.
-- 🎨 **Intuitive & Interactive UI:** Seamless, dynamic, and responsive user experience.
-- 🛠️ **Customizable Workflows:** Tailor modules to fit your creative or automation needs.
-- ⚡ **Instant Setup:** No backend or dependencies—just open in your browser and start creating!
-- 🌐 **Pure Frontend:** 100% client-side for privacy and speed.
+## Setup
 
----
-
-## 🖼️ Demo
-
-<p align="center">
-  <img src="https://via.placeholder.com/700x300?text=Demo+Screenshot+1" alt="ViralCraft-AI Demo 1"/>
-  <br>
-  <img src="https://via.placeholder.com/700x300?text=Demo+Screenshot+2" alt="ViralCraft-AI Demo 2"/>
-</p>
-<!--
-Replace the image URLs above with actual screenshots or gifs from your /assets folder or an external image host.
--->
-
----
-
-## 🖥️ Tech Stack
-
-| JavaScript | CSS | HTML |
-|:--:|:--:|:--:|
-| ![JavaScript](https://img.shields.io/badge/-JavaScript-yellow?logo=javascript&logoColor=white) | ![CSS](https://img.shields.io/badge/-CSS-blue?logo=css3&logoColor=white) | ![HTML](https://img.shields.io/badge/-HTML5-orange?logo=html5&logoColor=white) |
-
----
-
-## 🚦 Getting Started
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/fbmoulin/ViralCraft-AI.git
-   ```
-2. **Navigate to the project directory**
-   ```bash
-   cd ViralCraft-AI
-   ```
-3. **Open `index.html` in your browser**  
-   *(Or use your favorite local server for development!)*
-
-**Optional:**  
-Use a simple static server for local development:
 ```bash
-npx serve .
-# or
-python3 -m http.server
-```
-Then visit [http://localhost:8000](http://localhost:8000) in your browser.
-
----
-
-## 📝 Usage
-
-- Open `index.html` in your browser.
-- Explore the modules and features.
-- Start creating, automating, and sharing your digital content!
-
----
-
-## 🗂️ Project Structure
-
-```
-/
-├── index.html
-├── /src
-│   └── [JavaScript modules]
-├── /assets
-│   └── [images, icons, etc.]
-├── /styles
-│   └── main.css
-└── README.md
+git clone https://github.com/fbmoulin/ViralCraft-AI.git
+cd ViralCraft-AI/ViralCraft-AI
+cp .env.example .env       # then edit
+npm install
+npm start
 ```
 
----
+App listens on `PORT` (default `5000`).
 
-## ❓ FAQ
+### Required env vars
 
-**Q: Do I need to install any dependencies?**  
-A: No dependencies are required! Everything runs in your browser.
+| Variable | When | Notes |
+|---|---|---|
+| `NODE_ENV` | always | `development` \| `production` \| `test` |
+| `CORS_ORIGIN` | production | CSV of allowed origins; empty denies all |
+| `OPENAI_API_KEY` | for AI calls | Falls back to templated content if missing |
+| `DATABASE_URL` | optional | `sqlite:./soulclap.db` (default) or `postgresql://...?sslmode=require` |
+| `DEBUG_TOKEN` | production | Required to access `/api/debug`, `/api/test-ai`, etc. |
+| `AI_RATE_LIMIT_PER_MIN` | optional | Per-IP limit on AI routes (default 20) |
+| `LOG_LEVEL` | optional | `info` \| `warn` \| `error` \| `debug` |
 
-**Q: Can I use this on my phone or tablet?**  
-A: Yes, ViralCraft-AI is fully responsive and works on most modern devices.
+See [`.env.example`](ViralCraft-AI/.env.example) for the full set including Sentry, Redis, Clerk, and Stripe placeholders (Sprints 3–5).
 
-**Q: How do I contribute a new feature or module?**  
-A: Fork the repo, create a new branch, and submit a pull request. See the [Contributing](#-contributing) section.
+## Scripts
 
-**Q: Can I use my own AI models?**  
-A: Currently, ViralCraft-AI uses built-in JavaScript logic. Stay tuned for pluggable model support!
+```bash
+npm start            # node server.js
+npm run dev          # nodemon
+npm run lint         # eslint .
+npm run lint:fix     # eslint --fix
+npm run format       # prettier --write
+npm run format:check # prettier --check (CI)
+npm test             # jest
+npm run test:coverage
+npm run test:smoke   # legacy axios-based smoke test
+npm run setup-db     # bootstrap the database
+```
 
----
+## API
 
-## 💡 Contributing
+| Method | Path | Notes |
+|---|---|---|
+| GET  | `/api/health` | Cached 30s; includes DB + AI status |
+| GET  | `/api/test-integration` | Reports status of every subsystem |
+| POST | `/api/generate` | Rate-limited; generates platform-tailored content |
+| POST | `/api/suggest` | Rate-limited; lightweight title + outline suggestion |
+| POST | `/api/extract` | Rate-limited; accepts image / PDF / text uploads |
+| POST | `/api/generate-image` | Rate-limited; DALL·E 3 |
+| GET / PUT | `/api/content`, `/api/content/:id` | CRUD of saved content |
+| GET  | `/api/youtube/*` | YouTube video analysis |
+| GET  | `/api/logs/*` | Server logs (dev) |
+| GET / POST | `/api/debug`, `/api/test-ai`, `/api/clear-logs`, `/api/reinit-ai` | Admin — requires `x-debug-token` header in production |
 
-We welcome your ideas and contributions!  
-Feel free to [open an issue](https://github.com/fbmoulin/ViralCraft-AI/issues) or submit a pull request to help make ViralCraft-AI even better.
+All AI-intensive routes are rate-limited by IP (defaults: 20/min). All endpoints respect the `CORS_ORIGIN` whitelist.
 
----
+## Project layout
 
-## 📄 License
+```
+ViralCraft-AI/
+├── server.js                  # Express entrypoint
+├── config/app.js              # Centralized config
+├── routes/                    # Route modules
+├── services/                  # Business logic (ai, database, cache, ...)
+├── middleware/                # Express middleware (auth, monitoring, cache)
+├── utils/                     # Logger, error handler, helpers
+├── public/, static/           # Frontend (vanilla JS)
+├── __tests__/                 # Jest unit tests
+└── scripts/                   # CLI scripts (setup-db, test-apis)
+```
 
-This project is licensed under the MIT License.
+## Roadmap
 
----
+Hardening + SaaS-readiness in 5 sprints (≈ 4 weeks). See [`/root/.claude/plans/analise-e-procure-por-noble-mitten.md`](#) for the full plan.
 
-> Made with ❤️ by [fbmoulin](https://github.com/fbmoulin)
+| Sprint | Theme | Status |
+|---|---|---|
+| 1 | Security hardening (rate limits, CORS, CSP, debug auth) | ✅ |
+| 2 | Quality pipeline (ESLint, Prettier, Husky, Jest, CI) | ✅ |
+| 3 | Observability + refactor (Sentry, request IDs, Redis cache, repository pattern) | 🚧 |
+| 4 | Multi-user auth (Clerk + User/Org/Member schema) | ⏳ |
+| 5 | Billing (Stripe Checkout + Customer Portal + per-plan quotas) | ⏳ |
 
----
+## Contributing
 
+Branch off `main`, run `npm run lint && npm test` before pushing. Pre-commit hooks (lint-staged) keep formatting consistent.
+
+## License
+
+[MIT](LICENSE).

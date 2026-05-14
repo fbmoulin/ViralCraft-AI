@@ -1,264 +1,316 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Viral Content Creator</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
-    <link rel="stylesheet" href="/static/css/modernized-style.min.css">
-    <link rel="icon" href="/static/images/favicon.ico" type="image/x-icon">
-    <meta name="description" content="Crie conteúdo viral para suas redes sociais com IA - Viral Content Creator">
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    />
+    <link rel="stylesheet" href="/static/css/modernized-style.min.css" />
+    <link rel="icon" href="/static/images/favicon.ico" type="image/x-icon" />
+    <meta
+      name="description"
+      content="Crie conteúdo viral para suas redes sociais com IA - Viral Content Creator"
+    />
     <!-- Preload de recursos críticos -->
-    <link rel="preload" href="/static/js/modernized-app.min.js" as="script">
-    <link rel="preload" href="/static/css/modernized-style.min.css" as="style">
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" as="style">
-</head>
-<body>
+    <link rel="preload" href="/static/js/modernized-app.min.js" as="script" />
+    <link rel="preload" href="/static/css/modernized-style.min.css" as="style" />
+    <link
+      rel="preload"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      as="style"
+    />
+  </head>
+  <body>
     <!-- Tela de Carregamento -->
     <div id="loading-screen" class="loading-screen">
-        <div class="loading-logo">
-            <div class="logo-icon">✨</div>
-        </div>
-        <h1>Viral Content Creator</h1>
-        <p class="loading-text">Carregando plataforma...</p>
+      <div class="loading-logo">
+        <div class="logo-icon">✨</div>
+      </div>
+      <h1>Viral Content Creator</h1>
+      <p class="loading-text">Carregando plataforma...</p>
     </div>
 
     <!-- Conteúdo Principal -->
     <div id="main-content">
-        <!-- Header -->
-        <header>
-            <div class="container">
-                <div class="header-content">
-                    <div class="logo">
-                        <div class="logo-icon">🚀</div>
-                        <div class="logo-text">Viral Content Creator</div>
-                    </div>
-                    <div class="status-indicator">
-                        <span class="status-dot pulse"></span>
-                        <span>Online</span>
-                    </div>
-                </div>
+      <!-- Header -->
+      <header>
+        <div class="container">
+          <div class="header-content">
+            <div class="logo">
+              <div class="logo-icon">🚀</div>
+              <div class="logo-text">Viral Content Creator</div>
             </div>
-        </header>
-
-        <!-- Conteúdo Principal -->
-        <main>
-            <div class="container">
-                <!-- Status do Sistema -->
-                <div id="status-container" class="card">
-                    <div class="card-header">
-                        <h2 class="card-title">📈 Status do Sistema</h2>
-                    </div>
-                    <div class="system-status">
-                        <div class="status-item">
-                            <div class="status-label">Uptime</div>
-                            <div class="status-value" data-status="uptime">0h 0m 0s</div>
-                        </div>
-                        <div class="status-item">
-                            <div class="status-label">IA</div>
-                            <div class="status-value" data-status="ai">
-                                <span class="status-dot" style="background-color: var(--color-error)"></span> Inativo
-                            </div>
-                        </div>
-                        <div class="status-item">
-                            <div class="status-label">Database</div>
-                            <div class="status-value" data-status="database">
-                                <span class="status-dot"></span> Conectado
-                            </div>
-                        </div>
-                        <div class="status-item">
-                            <div class="status-label">Servidor</div>
-                            <div class="status-value" data-status="server">
-                                <span class="status-dot"></span> Online
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Formulário de Criação de Conteúdo -->
-                <div id="form-container" class="card">
-                    <div class="card-header">
-                        <h2 class="card-title">🚀 Criar Conteúdo Viral</h2>
-                        <p class="card-subtitle">Transforme suas ideias em conteúdo que engaja e converte</p>
-                    </div>
-
-                    <!-- Barra de Progresso -->
-                    <div class="progress-container">
-                        <div class="progress-steps">
-                            <div class="progress-step active" data-step="1">Informações Básicas</div>
-                            <div class="progress-step" data-step="2">Estilo e Tom</div>
-                            <div class="progress-step" data-step="3">Referências</div>
-                            <div class="progress-step" data-step="4">Contexto</div>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-bar-fill" style="width: 25%"></div>
-                        </div>
-                    </div>
-
-                    <!-- Abas do Formulário -->
-                    <div class="tabs">
-                        <div class="tab active" data-tab="tab-basic">Informações Básicas</div>
-                        <div class="tab" data-tab="tab-style">Estilo e Tom</div>
-                        <div class="tab" data-tab="tab-references">Referências</div>
-                        <div class="tab" data-tab="tab-context">Contexto Adicional</div>
-                    </div>
-
-                    <form id="content-form">
-                        <!-- Aba 1: Informações Básicas -->
-                        <div id="tab-basic" class="tab-content active">
-                            <div class="form-group">
-                                <label for="topic" class="form-label">Tópico Principal</label>
-                                <input type="text" id="topic" name="topic" class="form-input" placeholder="Ex: Como triplicar produtividade trabalhando de casa" required>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="platform" class="form-label">Plataforma</label>
-                                <select id="platform" name="platform" class="form-select" required>
-                                    <option value="instagram">Instagram</option>
-                                    <option value="linkedin">LinkedIn</option>
-                                    <option value="twitter">Twitter</option>
-                                    <option value="facebook">Facebook</option>
-                                    <option value="tiktok">TikTok</option>
-                                    <option value="blog">Blog</option>
-                                    <option value="email">Email</option>
-                                    <option value="all" selected>Todas as Plataformas</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="contentType" class="form-label">Tipo de Conteúdo</label>
-                                <select id="contentType" name="contentType" class="form-select" required>
-                                    <option value="post" selected>Post Social</option>
-                                    <option value="article">Artigo</option>
-                                    <option value="newsletter">Newsletter</option>
-                                    <option value="script">Roteiro de Vídeo</option>
-                                    <option value="carousel">Carrossel</option>
-                                </select>
-                            </div>
-
-                            <div class="flex justify-between mt-6">
-                                <button type="button" class="btn btn-secondary" id="suggest-button">
-                                    <span>💡</span> Sugerir Ideias
-                                </button>
-                                <button type="button" class="btn btn-primary next-tab" data-next="tab-style">
-                                    Próximo <span>→</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Aba 2: Estilo e Tom -->
-                        <div id="tab-style" class="tab-content">
-                            <div class="form-group">
-                                <label class="form-label">Tom do Conteúdo</label>
-                                <div class="radio-group">
-                                    <label class="radio-label">
-                                        <input type="radio" name="tone" value="inspirador" checked>
-                                        <span>✨ Inspirador</span>
-                                    </label>
-                                    <label class="radio-label">
-                                        <input type="radio" name="tone" value="educativo">
-                                        <span>📚 Educativo</span>
-                                    </label>
-                                    <label class="radio-label">
-                                        <input type="radio" name="tone" value="divertido">
-                                        <span>😄 Divertido</span>
-                                    </label>
-                                    <label class="radio-label">
-                                        <input type="radio" name="tone" value="profissional">
-                                        <span>💼 Profissional</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="keywords" class="form-label">Palavras-chave (separadas por vírgula)</label>
-                                <input type="text" id="keywords" name="keywords" class="form-input" placeholder="produtividade, home office, organização">
-                            </div>
-
-                            <div class="flex justify-between mt-6">
-                                <button type="button" class="btn btn-secondary prev-tab" data-prev="tab-basic">
-                                    <span>←</span> Anterior
-                                </button>
-                                <button type="button" class="btn btn-primary next-tab" data-next="tab-references">
-                                    Próximo <span>→</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Aba 3: Referências -->
-                        <div id="tab-references" class="tab-content">
-                            <div class="form-group">
-                                <label for="youtubeUrl" class="form-label">Link do YouTube</label>
-                                <input type="url" id="youtubeUrl" name="youtubeUrl" class="form-input" placeholder="https://www.youtube.com/watch?v=...">
-                            </div>
-
-                            <div class="form-group">
-                                <label for="webUrl" class="form-label">Link da Web</label>
-                                <input type="url" id="webUrl" name="webUrl" class="form-input" placeholder="https://exemplo.com/artigo">
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label">Upload de Arquivo (PDF, DOCX, TXT)</label>
-                                <div class="file-upload">
-                                    <input type="file" id="file" name="file" accept=".pdf,.docx,.txt,image/*">
-                                    <div class="file-upload-button">
-                                        <span>📁</span> Clique para selecionar arquivo
-                                    </div>
-                                    <div class="file-preview"></div>
-                                </div>
-                            </div>
-
-                            <div class="flex justify-between mt-6">
-                                <button type="button" class="btn btn-secondary prev-tab" data-prev="tab-style">
-                                    <span>←</span> Anterior
-                                </button>
-                                <button type="button" class="btn btn-primary next-tab" data-next="tab-context">
-                                    Próximo <span>→</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Aba 4: Contexto Adicional -->
-                        <div id="tab-context" class="tab-content">
-                            <div class="form-group">
-                                <label for="additionalContext" class="form-label">Contexto Adicional (opcional)</label>
-                                <textarea id="additionalContext" name="additionalContext" class="form-textarea" placeholder="Adicione qualquer informação adicional que possa ajudar na criação do conteúdo..."></textarea>
-                            </div>
-
-                            <div class="flex justify-between mt-6">
-                                <button type="button" class="btn btn-secondary prev-tab" data-prev="tab-references">
-                                    <span>←</span> Anterior
-                                </button>
-                                <button type="button" class="btn btn-primary btn-large" id="generate-button">
-                                    <span>🚀</span> Gerar Conteúdo Viral
-                                </button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-
-                <!-- Área de Sugestão -->
-                <div id="suggestion-container" class="hidden"></div>
-
-                <!-- Área de Resultado -->
-                <div id="result-container" class="result-area hidden">
-                    <div class="card-header">
-                        <h2 class="card-title">🚀 Conteúdo Gerado</h2>
-                    </div>
-                    <div class="result-content"></div>
-                    <div class="result-actions flex gap-4 mt-6"></div>
-                </div>
+            <div class="status-indicator">
+              <span class="status-dot pulse"></span>
+              <span>Online</span>
             </div>
-        </main>
+          </div>
+        </div>
+      </header>
 
-        <!-- Footer -->
-        <footer>
-            <div class="container">
-                <div class="text-center mt-8 mb-8" style="color: rgba(255, 255, 255, 0.6); font-size: 0.875rem;">
-                    © 2025 Viral Content Creator | Desenvolvido com ❤️ para criadores de conteúdo
-                </div>
+      <!-- Conteúdo Principal -->
+      <main>
+        <div class="container">
+          <!-- Status do Sistema -->
+          <div id="status-container" class="card">
+            <div class="card-header">
+              <h2 class="card-title">📈 Status do Sistema</h2>
             </div>
-        </footer>
+            <div class="system-status">
+              <div class="status-item">
+                <div class="status-label">Uptime</div>
+                <div class="status-value" data-status="uptime">0h 0m 0s</div>
+              </div>
+              <div class="status-item">
+                <div class="status-label">IA</div>
+                <div class="status-value" data-status="ai">
+                  <span class="status-dot" style="background-color: var(--color-error)"></span>
+                  Inativo
+                </div>
+              </div>
+              <div class="status-item">
+                <div class="status-label">Database</div>
+                <div class="status-value" data-status="database">
+                  <span class="status-dot"></span> Conectado
+                </div>
+              </div>
+              <div class="status-item">
+                <div class="status-label">Servidor</div>
+                <div class="status-value" data-status="server">
+                  <span class="status-dot"></span> Online
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Formulário de Criação de Conteúdo -->
+          <div id="form-container" class="card">
+            <div class="card-header">
+              <h2 class="card-title">🚀 Criar Conteúdo Viral</h2>
+              <p class="card-subtitle">Transforme suas ideias em conteúdo que engaja e converte</p>
+            </div>
+
+            <!-- Barra de Progresso -->
+            <div class="progress-container">
+              <div class="progress-steps">
+                <div class="progress-step active" data-step="1">Informações Básicas</div>
+                <div class="progress-step" data-step="2">Estilo e Tom</div>
+                <div class="progress-step" data-step="3">Referências</div>
+                <div class="progress-step" data-step="4">Contexto</div>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-bar-fill" style="width: 25%"></div>
+              </div>
+            </div>
+
+            <!-- Abas do Formulário -->
+            <div class="tabs">
+              <div class="tab active" data-tab="tab-basic">Informações Básicas</div>
+              <div class="tab" data-tab="tab-style">Estilo e Tom</div>
+              <div class="tab" data-tab="tab-references">Referências</div>
+              <div class="tab" data-tab="tab-context">Contexto Adicional</div>
+            </div>
+
+            <form id="content-form">
+              <!-- Aba 1: Informações Básicas -->
+              <div id="tab-basic" class="tab-content active">
+                <div class="form-group">
+                  <label for="topic" class="form-label">Tópico Principal</label>
+                  <input
+                    type="text"
+                    id="topic"
+                    name="topic"
+                    class="form-input"
+                    placeholder="Ex: Como triplicar produtividade trabalhando de casa"
+                    required
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label for="platform" class="form-label">Plataforma</label>
+                  <select id="platform" name="platform" class="form-select" required>
+                    <option value="instagram">Instagram</option>
+                    <option value="linkedin">LinkedIn</option>
+                    <option value="twitter">Twitter</option>
+                    <option value="facebook">Facebook</option>
+                    <option value="tiktok">TikTok</option>
+                    <option value="blog">Blog</option>
+                    <option value="email">Email</option>
+                    <option value="all" selected>Todas as Plataformas</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="contentType" class="form-label">Tipo de Conteúdo</label>
+                  <select id="contentType" name="contentType" class="form-select" required>
+                    <option value="post" selected>Post Social</option>
+                    <option value="article">Artigo</option>
+                    <option value="newsletter">Newsletter</option>
+                    <option value="script">Roteiro de Vídeo</option>
+                    <option value="carousel">Carrossel</option>
+                  </select>
+                </div>
+
+                <div class="flex justify-between mt-6">
+                  <button type="button" class="btn btn-secondary" id="suggest-button">
+                    <span>💡</span> Sugerir Ideias
+                  </button>
+                  <button type="button" class="btn btn-primary next-tab" data-next="tab-style">
+                    Próximo <span>→</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Aba 2: Estilo e Tom -->
+              <div id="tab-style" class="tab-content">
+                <div class="form-group">
+                  <label class="form-label">Tom do Conteúdo</label>
+                  <div class="radio-group">
+                    <label class="radio-label">
+                      <input type="radio" name="tone" value="inspirador" checked />
+                      <span>✨ Inspirador</span>
+                    </label>
+                    <label class="radio-label">
+                      <input type="radio" name="tone" value="educativo" />
+                      <span>📚 Educativo</span>
+                    </label>
+                    <label class="radio-label">
+                      <input type="radio" name="tone" value="divertido" />
+                      <span>😄 Divertido</span>
+                    </label>
+                    <label class="radio-label">
+                      <input type="radio" name="tone" value="profissional" />
+                      <span>💼 Profissional</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="keywords" class="form-label"
+                    >Palavras-chave (separadas por vírgula)</label
+                  >
+                  <input
+                    type="text"
+                    id="keywords"
+                    name="keywords"
+                    class="form-input"
+                    placeholder="produtividade, home office, organização"
+                  />
+                </div>
+
+                <div class="flex justify-between mt-6">
+                  <button type="button" class="btn btn-secondary prev-tab" data-prev="tab-basic">
+                    <span>←</span> Anterior
+                  </button>
+                  <button type="button" class="btn btn-primary next-tab" data-next="tab-references">
+                    Próximo <span>→</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Aba 3: Referências -->
+              <div id="tab-references" class="tab-content">
+                <div class="form-group">
+                  <label for="youtubeUrl" class="form-label">Link do YouTube</label>
+                  <input
+                    type="url"
+                    id="youtubeUrl"
+                    name="youtubeUrl"
+                    class="form-input"
+                    placeholder="https://www.youtube.com/watch?v=..."
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label for="webUrl" class="form-label">Link da Web</label>
+                  <input
+                    type="url"
+                    id="webUrl"
+                    name="webUrl"
+                    class="form-input"
+                    placeholder="https://exemplo.com/artigo"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Upload de Arquivo (PDF, DOCX, TXT)</label>
+                  <div class="file-upload">
+                    <input type="file" id="file" name="file" accept=".pdf,.docx,.txt,image/*" />
+                    <div class="file-upload-button">
+                      <span>📁</span> Clique para selecionar arquivo
+                    </div>
+                    <div class="file-preview"></div>
+                  </div>
+                </div>
+
+                <div class="flex justify-between mt-6">
+                  <button type="button" class="btn btn-secondary prev-tab" data-prev="tab-style">
+                    <span>←</span> Anterior
+                  </button>
+                  <button type="button" class="btn btn-primary next-tab" data-next="tab-context">
+                    Próximo <span>→</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Aba 4: Contexto Adicional -->
+              <div id="tab-context" class="tab-content">
+                <div class="form-group">
+                  <label for="additionalContext" class="form-label"
+                    >Contexto Adicional (opcional)</label
+                  >
+                  <textarea
+                    id="additionalContext"
+                    name="additionalContext"
+                    class="form-textarea"
+                    placeholder="Adicione qualquer informação adicional que possa ajudar na criação do conteúdo..."
+                  ></textarea>
+                </div>
+
+                <div class="flex justify-between mt-6">
+                  <button
+                    type="button"
+                    class="btn btn-secondary prev-tab"
+                    data-prev="tab-references"
+                  >
+                    <span>←</span> Anterior
+                  </button>
+                  <button type="button" class="btn btn-primary btn-large" id="generate-button">
+                    <span>🚀</span> Gerar Conteúdo Viral
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <!-- Área de Sugestão -->
+          <div id="suggestion-container" class="hidden"></div>
+
+          <!-- Área de Resultado -->
+          <div id="result-container" class="result-area hidden">
+            <div class="card-header">
+              <h2 class="card-title">🚀 Conteúdo Gerado</h2>
+            </div>
+            <div class="result-content"></div>
+            <div class="result-actions flex gap-4 mt-6"></div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Footer -->
+      <footer>
+        <div class="container">
+          <div
+            class="text-center mt-8 mb-8"
+            style="color: rgba(255, 255, 255, 0.6); font-size: 0.875rem"
+          >
+            © 2025 Viral Content Creator | Desenvolvido com ❤️ para criadores de conteúdo
+          </div>
+        </div>
+      </footer>
     </div>
 
     <!-- Scripts carregados de forma otimizada -->
@@ -266,39 +318,39 @@
 
     <!-- Carregamento assíncrono de recursos não críticos -->
     <script>
-        // Carregamento assíncrono de recursos adicionais
-        window.addEventListener('load', function() {
-            // Função para carregar scripts de forma assíncrona
-            function loadScript(src) {
-                return new Promise((resolve, reject) => {
-                    const script = document.createElement('script');
-                    script.src = src;
-                    script.async = true;
-                    script.onload = resolve;
-                    script.onerror = reject;
-                    document.body.appendChild(script);
-                });
-            }
+      // Carregamento assíncrono de recursos adicionais
+      window.addEventListener('load', function () {
+        // Função para carregar scripts de forma assíncrona
+        function loadScript(src) {
+          return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = src;
+            script.async = true;
+            script.onload = resolve;
+            script.onerror = reject;
+            document.body.appendChild(script);
+          });
+        }
 
-            // Carregar scripts adicionais quando necessário
-            if ('IntersectionObserver' in window) {
-                const lazyImages = document.querySelectorAll('.lazy-load');
-                const imageObserver = new IntersectionObserver((entries) => {
-                    entries.forEach(entry => {
-                        if (entry.isIntersecting) {
-                            const img = entry.target;
-                            img.src = img.dataset.src;
-                            img.classList.remove('lazy-load');
-                            imageObserver.unobserve(img);
-                        }
-                    });
-                });
+        // Carregar scripts adicionais quando necessário
+        if ('IntersectionObserver' in window) {
+          const lazyImages = document.querySelectorAll('.lazy-load');
+          const imageObserver = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                const img = entry.target;
+                img.src = img.dataset.src;
+                img.classList.remove('lazy-load');
+                imageObserver.unobserve(img);
+              }
+            });
+          });
 
-                lazyImages.forEach(img => {
-                    imageObserver.observe(img);
-                });
-            }
-        });
+          lazyImages.forEach((img) => {
+            imageObserver.observe(img);
+          });
+        }
+      });
     </script>
-</body>
+  </body>
 </html>

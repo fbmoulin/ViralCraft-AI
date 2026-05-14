@@ -1,4 +1,3 @@
-
 const winston = require('winston');
 const DailyRotateFile = require('winston-daily-rotate-file');
 const path = require('path');
@@ -72,12 +71,12 @@ class LogMonitor {
       message: error.message,
       stack: error.stack
     });
-    
+
     // Keep only last 10 errors
     if (this.lastErrors.length > 10) {
       this.lastErrors.shift();
     }
-    
+
     // Alert if too many errors
     if (this.errorCount > 10) {
       logger.warn('🚨 High error rate detected', {
@@ -113,29 +112,29 @@ const enhancedLogger = {
   info: (message, meta = {}) => {
     logger.info(message, meta);
   },
-  
+
   warn: (message, meta = {}) => {
     monitor.warningCount++;
     logger.warn(message, meta);
   },
-  
+
   error: (message, error = null, meta = {}) => {
     if (error instanceof Error) {
       monitor.trackError(error);
-      logger.error(message, { 
-        error: error.message, 
-        stack: error.stack, 
-        ...meta 
+      logger.error(message, {
+        error: error.message,
+        stack: error.stack,
+        ...meta
       });
     } else {
       logger.error(message, meta);
     }
   },
-  
+
   debug: (message, meta = {}) => {
     logger.debug(message, meta);
   },
-  
+
   getStats: () => monitor.getStats(),
   resetStats: () => monitor.reset()
 };

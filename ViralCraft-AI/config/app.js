@@ -1,4 +1,3 @@
-
 const path = require('path');
 
 module.exports = {
@@ -15,14 +14,14 @@ module.exports = {
       }
     }
   },
-  
+
   // Content configuration
   content: {
     contentTypes: ['post', 'story', 'reel', 'video', 'short', 'article', 'thread'],
     platforms: ['instagram', 'tiktok', 'youtube', 'twitter', 'linkedin', 'facebook'],
     tones: ['professional', 'casual', 'humorous', 'inspiring', 'educational', 'persuasive']
   },
-  
+
   // AI configuration
   ai: {
     timeout: 30000,
@@ -32,14 +31,14 @@ module.exports = {
       anthropic: { rpm: 50, tpm: 40000 }
     }
   },
-  
+
   // Cache configuration
   cache: {
     ttl: 300000, // 5 minutes
     maxSize: 1000,
     enabled: true
   },
-  
+
   // Server configuration
   server: {
     port: process.env.PORT || 5000,

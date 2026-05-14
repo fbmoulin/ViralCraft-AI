@@ -23,7 +23,9 @@ router.get('/debug', (req, res) => {
         openaiConfigured: !!process.env.OPENAI_API_KEY,
         anthropicConfigured: !!process.env.ANTHROPIC_API_KEY,
         databaseType: process.env.DATABASE_URL
-          ? (process.env.DATABASE_URL.startsWith('sqlite:') ? 'sqlite' : 'postgres')
+          ? process.env.DATABASE_URL.startsWith('sqlite:')
+            ? 'sqlite'
+            : 'postgres'
           : 'sqlite-default',
         logLevel: process.env.LOG_LEVEL || 'info'
       },
@@ -50,7 +52,7 @@ router.get('/debug', (req, res) => {
 router.get('/test-ai', async (req, res) => {
   try {
     const aiService = require('../services/ai');
-    
+
     const testResults = {
       openai: {
         configured: !!process.env.OPENAI_API_KEY,

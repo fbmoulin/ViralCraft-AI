@@ -1,4 +1,4 @@
-// ytdl-core already declared above
+const ytdl = require('ytdl-core');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
@@ -47,14 +47,14 @@ class YouTubeAnalyzer {
         keywords: videoInfo.videoDetails.keywords || [],
         thumbnailUrl: videoInfo.videoDetails.thumbnails[0]?.url,
         category: videoInfo.videoDetails.category,
-        isLiveContent: videoInfo.videoDetails.isLiveContent,
+        isLiveContent: videoInfo.videoDetails.isLiveContent
       };
 
       // Extract engagement metrics
       const engagement = {
         likeCount: parseInt(videoInfo.videoDetails.likes) || 0,
         dislikeCount: parseInt(videoInfo.videoDetails.dislikes) || 0,
-        commentCount: parseInt(videoInfo.videoDetails.comments) || 0,
+        commentCount: parseInt(videoInfo.videoDetails.comments) || 0
       };
 
       // Create the analysis object
@@ -64,16 +64,16 @@ class YouTubeAnalyzer {
         url: videoUrl,
         metadata,
         engagement,
-        formats: videoInfo.formats.slice(0, 5).map(format => ({
+        formats: videoInfo.formats.slice(0, 5).map((format) => ({
           quality: format.qualityLabel,
           mimeType: format.mimeType,
           container: format.container,
           hasAudio: format.hasAudio,
           hasVideo: format.hasVideo,
-          bitrate: format.bitrate,
+          bitrate: format.bitrate
         })),
         analysisDate: new Date().toISOString(),
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toISOString()
       };
 
       return analysis;
@@ -157,7 +157,7 @@ class YouTubeAnalyzer {
   static async getAnalysisById(id) {
     try {
       const analyses = await this.getAllAnalyses();
-      return analyses.find(analysis => analysis.id === id) || null;
+      return analyses.find((analysis) => analysis.id === id) || null;
     } catch (error) {
       console.error('Error getting analysis by ID:', error);
       throw error;

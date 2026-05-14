@@ -27,7 +27,7 @@ class TextAnalysisService {
    * @returns {number} Número de palavras
    */
   countWords(text) {
-    return text.split(/\s+/).filter(word => word.length > 0).length;
+    return text.split(/\s+/).filter((word) => word.length > 0).length;
   }
 
   /**
@@ -49,7 +49,7 @@ class TextAnalysisService {
    */
   calculateViralScore(content, platform) {
     let score = 60; // Pontuação base
-    
+
     // Otimização de comprimento
     const wordCount = this.countWords(content);
     const platformOptimal = {
@@ -58,34 +58,42 @@ class TextAnalysisService {
       linkedin: { min: 200, max: 500 },
       blog: { min: 800, max: 2000 }
     };
-    
+
     const optimal = platformOptimal[platform] || { min: 100, max: 500 };
     if (wordCount >= optimal.min && wordCount <= optimal.max) {
       score += 15;
     }
-    
+
     // Gatilhos emocionais
     const emotionalWords = [
-      'transformar', 'descobrir', 'revolucionar', 'impactar', 'inspirar',
-      'segredo', 'incrível', 'surpreendente', 'exclusivo', 'garantido'
+      'transformar',
+      'descobrir',
+      'revolucionar',
+      'impactar',
+      'inspirar',
+      'segredo',
+      'incrível',
+      'surpreendente',
+      'exclusivo',
+      'garantido'
     ];
-    
-    const emotionalCount = emotionalWords.filter(word => 
+
+    const emotionalCount = emotionalWords.filter((word) =>
       content.toLowerCase().includes(word)
     ).length;
-    
+
     score += Math.min(emotionalCount * 3, 15);
-    
+
     // Elementos de engajamento
     if (content.includes('?')) score += 5; // Perguntas
     if (/[🎯💡🚀✨⚡🔥💪🎉]/g.test(content)) score += 8; // Emojis de impacto
     if (content.includes('#')) score += 5; // Hashtags
     if (/compartilhe|comente|marque|salve/i.test(content)) score += 10; // CTAs
-    
+
     // Elementos estruturais
     if (content.includes('•') || content.includes('-')) score += 5; // Listas
     if (content.split('\n').length > 3) score += 5; // Formatação
-    
+
     return Math.min(Math.max(score, 0), 100);
   }
 
@@ -97,19 +105,35 @@ class TextAnalysisService {
   analyzeSentiment(content) {
     // Análise simples de sentimento
     const positiveWords = [
-      'excelente', 'incrível', 'fantástico', 'perfeito', 'sucesso',
-      'ótimo', 'maravilhoso', 'espetacular', 'extraordinário', 'feliz'
+      'excelente',
+      'incrível',
+      'fantástico',
+      'perfeito',
+      'sucesso',
+      'ótimo',
+      'maravilhoso',
+      'espetacular',
+      'extraordinário',
+      'feliz'
     ];
-    
+
     const negativeWords = [
-      'problema', 'dificuldade', 'erro', 'fracasso', 'impossível',
-      'ruim', 'péssimo', 'terrível', 'horrível', 'falha'
+      'problema',
+      'dificuldade',
+      'erro',
+      'fracasso',
+      'impossível',
+      'ruim',
+      'péssimo',
+      'terrível',
+      'horrível',
+      'falha'
     ];
-    
+
     const words = content.toLowerCase().split(/\s+/);
-    const positiveCount = positiveWords.filter(word => words.includes(word)).length;
-    const negativeCount = negativeWords.filter(word => words.includes(word)).length;
-    
+    const positiveCount = positiveWords.filter((word) => words.includes(word)).length;
+    const negativeCount = negativeWords.filter((word) => words.includes(word)).length;
+
     if (positiveCount > negativeCount) return 'positive';
     if (negativeCount > positiveCount) return 'negative';
     return 'neutral';
@@ -124,37 +148,37 @@ class TextAnalysisService {
   getOptimizationSuggestions(content, platform) {
     const suggestions = [];
     const wordCount = this.countWords(content);
-    
+
     // Sugestões específicas por plataforma
     if (platform === 'twitter' && wordCount > 40) {
       suggestions.push('Considere criar um thread para melhor engajamento');
     }
-    
+
     if (platform === 'instagram' && wordCount < 50) {
       suggestions.push('Adicione mais contexto para aumentar o engajamento');
     }
-    
+
     if (platform === 'linkedin' && wordCount < 100) {
       suggestions.push('Conteúdos mais detalhados tendem a performar melhor no LinkedIn');
     }
-    
+
     // Sugestões gerais
     if (!content.includes('?')) {
       suggestions.push('Adicione uma pergunta para aumentar engajamento');
     }
-    
+
     if (!/[🎯💡🚀✨⚡]/g.test(content)) {
       suggestions.push('Use emojis estratégicos para destacar pontos importantes');
     }
-    
+
     if (!/#/g.test(content) && platform !== 'email') {
       suggestions.push('Inclua hashtags relevantes para aumentar alcance');
     }
-    
+
     if (content.split('\n').length < 3) {
       suggestions.push('Melhore a formatação com quebras de linha para facilitar a leitura');
     }
-    
+
     return suggestions;
   }
 }

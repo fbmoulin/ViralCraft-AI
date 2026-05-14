@@ -10,7 +10,12 @@ const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
 const config = require('./config/app');
 const logger = require('./utils/logger');
-const { systemMonitoring, requestLogging, errorTracking, getHealthData } = require('./middleware/monitoring');
+const {
+  systemMonitoring,
+  requestLogging,
+  errorTracking,
+  getHealthData
+} = require('./middleware/monitoring');
 
 // Initialize global error handlers
 require('./utils/error-handler');
@@ -21,42 +26,63 @@ const PORT = process.env.PORT || 3000;
 
 // Logging setup
 const morganFormat = process.env.NODE_ENV === 'production' ? 'combined' : 'dev';
-app.use(morgan(morganFormat, {
-  stream: {
-    write: (message) => logger.info(message.trim())
-  }
-}));
+app.use(
+  morgan(morganFormat, {
+    stream: {
+      write: (message) => logger.info(message.trim())
+    }
+  })
+);
 
 // Monitoring middleware
 app.use(systemMonitoring);
 app.use(requestLogging);
 
 // Security middleware — helmet with CSP enabled for production-grade defaults
-app.use(helmet({
-  contentSecurityPolicy: {
-    useDefaults: true,
-    directives: {
-      'default-src': ["'self'"],
-      'script-src': ["'self'", "'unsafe-inline'", 'https://*.clerk.accounts.dev', 'https://*.clerk.com', 'https://js.stripe.com'],
-      'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-      'font-src': ["'self'", 'https://fonts.gstatic.com', 'data:'],
-      'img-src': ["'self'", 'data:', 'https:', 'blob:'],
-      'connect-src': ["'self'", 'https://*.clerk.accounts.dev', 'https://*.clerk.com', 'https://api.stripe.com'],
-      'frame-src': ["'self'", 'https://js.stripe.com', 'https://hooks.stripe.com']
-    }
-  },
-  crossOriginEmbedderPolicy: false
-}));
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        'default-src': ["'self'"],
+        'script-src': [
+          "'self'",
+          "'unsafe-inline'",
+          'https://*.clerk.accounts.dev',
+          'https://*.clerk.com',
+          'https://js.stripe.com'
+        ],
+        'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        'font-src': ["'self'", 'https://fonts.gstatic.com', 'data:'],
+        'img-src': ["'self'", 'data:', 'https:', 'blob:'],
+        'connect-src': [
+          "'self'",
+          'https://*.clerk.accounts.dev',
+          'https://*.clerk.com',
+          'https://api.stripe.com'
+        ],
+        'frame-src': ["'self'", 'https://js.stripe.com', 'https://hooks.stripe.com']
+      }
+    },
+    crossOriginEmbedderPolicy: false
+  })
+);
 app.use(compression());
 
 // CORS: whitelist explicit origins, no wildcard in production
-const corsOrigins = config.server.cors.origin === '*'
-  ? '*'
-  : config.server.cors.origin.split(',').map((o) => o.trim()).filter(Boolean);
-app.use(cors({
-  origin: corsOrigins,
-  credentials: config.server.cors.credentials
-}));
+const corsOrigins =
+  config.server.cors.origin === '*'
+    ? '*'
+    : config.server.cors.origin
+        .split(',')
+        .map((o) => o.trim())
+        .filter(Boolean);
+app.use(
+  cors({
+    origin: corsOrigins,
+    credentials: config.server.cors.credentials
+  })
+);
 
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
@@ -156,7 +182,6 @@ const connectDB = async () => {
   }
 };
 
-
 // API Routes
 // API Integration Test Endpoint
 app.get('/api/test-integration', async (req, res) => {
@@ -184,9 +209,9 @@ app.get('/api/test-integration', async (req, res) => {
   try {
     if (global.aiService) {
       const aiStatus = global.aiService.getStatus();
-      tests.aiService = { 
-        status: aiStatus.initialized ? 'ok' : 'error', 
-        details: `OpenAI: ${aiStatus.openai ? '✅' : '❌'}, Fallback: ${aiStatus.fallbackMode ? 'enabled' : 'disabled'}` 
+      tests.aiService = {
+        status: aiStatus.initialized ? 'ok' : 'error',
+        details: `OpenAI: ${aiStatus.openai ? '✅' : '❌'}, Fallback: ${aiStatus.fallbackMode ? 'enabled' : 'disabled'}`
       };
     } else {
       tests.aiService = { status: 'error', details: 'AI service not initialized' };
@@ -199,9 +224,9 @@ app.get('/api/test-integration', async (req, res) => {
   try {
     const performanceService = require('./services/performanceService');
     const healthChecks = await performanceService.runHealthChecks();
-    tests.performance = { 
-      status: 'ok', 
-      details: `Health: ${JSON.stringify(healthChecks)}` 
+    tests.performance = {
+      status: 'ok',
+      details: `Health: ${JSON.stringify(healthChecks)}`
     };
   } catch (error) {
     tests.performance = { status: 'error', details: error.message };
@@ -229,7 +254,9 @@ app.get('/api/test-integration', async (req, res) => {
     tests.staticFiles = { status: 'error', details: error.message };
   }
 
-  const overallStatus = Object.values(tests).every(test => test.status === 'ok') ? 'ok' : 'partial';
+  const overallStatus = Object.values(tests).every((test) => test.status === 'ok')
+    ? 'ok'
+    : 'partial';
 
   res.json({
     success: true,
@@ -240,7 +267,8 @@ app.get('/api/test-integration', async (req, res) => {
 });
 
 // Enhanced health check endpoint with monitoring
-app.get('/api/health', apiCache(30000), async (req, res) => { // Cache for 30 seconds
+app.get('/api/health', apiCache(30000), async (req, res) => {
+  // Cache for 30 seconds
   try {
     let dbStatus = { connected: false };
 
@@ -254,8 +282,8 @@ app.get('/api/health', apiCache(30000), async (req, res) => { // Cache for 30 se
         };
       } catch (error) {
         logger.error('Database health check failed', error);
-        dbStatus = { 
-          connected: false, 
+        dbStatus = {
+          connected: false,
           error: error.message
         };
       }
@@ -263,8 +291,8 @@ app.get('/api/health', apiCache(30000), async (req, res) => { // Cache for 30 se
 
     const healthData = getHealthData();
 
-    res.json({ 
-      status: 'ok', 
+    res.json({
+      status: 'ok',
       timestamp: new Date().toISOString(),
       uptime: Math.floor(process.uptime()) + ' seconds',
       memory: healthData.memory,
@@ -320,7 +348,10 @@ app.post('/api/extract', aiRateLimiter, upload.single('file'), async (req, res) 
             role: 'user',
             content: [
               { type: 'text', text: 'Extract all text from this image in a structured format:' },
-              { type: 'image_url', image_url: { url: `data:${file.mimetype};base64,${base64Image}` } }
+              {
+                type: 'image_url',
+                image_url: { url: `data:${file.mimetype};base64,${base64Image}` }
+              }
             ]
           }
         ],
@@ -329,7 +360,7 @@ app.post('/api/extract', aiRateLimiter, upload.single('file'), async (req, res) 
       extractedData = response.choices[0].message.content;
     } else if (file.mimetype === 'application/pdf') {
       // Simulation of PDF processing
-      extractedData = "Content extracted from PDF (simulation)";
+      extractedData = 'Content extracted from PDF (simulation)';
     } else {
       // Process text
       extractedData = file.buffer.toString('utf-8');
@@ -345,12 +376,12 @@ app.post('/api/extract', aiRateLimiter, upload.single('file'), async (req, res) 
 // Generate content
 app.post('/api/generate', aiRateLimiter, async (req, res) => {
   try {
-    const { 
-      topic, 
-      contentType, 
-      platform, 
-      keywords, 
-      tone, 
+    const {
+      topic,
+      contentType,
+      platform,
+      keywords,
+      tone,
       extractedData,
       additionalContext,
       suggestedTitle,
@@ -385,7 +416,7 @@ app.post('/api/generate', aiRateLimiter, async (req, res) => {
           metadata: {
             tone,
             generatedAt: new Date(),
-            model: global.anthropic ? 'claude-3-sonnet' : (global.openai ? 'gpt-4' : 'mock')
+            model: global.anthropic ? 'claude-3-sonnet' : global.openai ? 'gpt-4' : 'mock'
           }
         });
       }
@@ -398,7 +429,6 @@ app.post('/api/generate', aiRateLimiter, async (req, res) => {
       success: true,
       content: adaptedContent
     });
-
   } catch (error) {
     logger.error('Generation error', error);
     res.status(500).json({ error: 'Error generating content' });
@@ -410,20 +440,14 @@ app.post('/api/generate', aiRateLimiter, async (req, res) => {
 // Suggest content (lightweight preview)
 app.post('/api/suggest', aiRateLimiter, async (req, res) => {
   try {
-    const { 
-      topic, 
-      contentType, 
-      platform, 
-      keywords, 
-      tone, 
-      extractedData,
-      additionalContext 
-    } = req.body;
+    const { topic, contentType, platform, keywords, tone, extractedData, additionalContext } =
+      req.body;
 
     // Check if AI services are configured
     if (!global.openai && !global.anthropic) {
-      return res.status(500).json({ 
-        error: 'AI services not configured. Configure OPENAI_API_KEY and/or ANTHROPIC_API_KEY in .env' 
+      return res.status(500).json({
+        error:
+          'AI services not configured. Configure OPENAI_API_KEY and/or ANTHROPIC_API_KEY in .env'
       });
     }
 
@@ -452,9 +476,9 @@ app.post('/api/suggest', aiRateLimiter, async (req, res) => {
     if (global.anthropic) {
       // Use Claude for suggestion
       const response = await global.anthropic.messages.create({
-        model: "claude-3-haiku-20240307",
+        model: 'claude-3-haiku-20240307',
         system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
+        messages: [{ role: 'user', content: userPrompt }],
         max_tokens: 1000
       });
 
@@ -462,10 +486,10 @@ app.post('/api/suggest', aiRateLimiter, async (req, res) => {
     } else if (global.openai) {
       // Fallback to OpenAI if Anthropic is not available
       const response = await global.openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: 'gpt-3.5-turbo',
         messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
         ],
         max_tokens: 1000
       });
@@ -503,7 +527,6 @@ app.post('/api/suggest', aiRateLimiter, async (req, res) => {
       success: true,
       suggestion
     });
-
   } catch (error) {
     logger.error('Suggestion error', error);
     res.status(500).json({ error: 'Error generating suggestion' });
@@ -594,11 +617,11 @@ app.post('/api/generate-image', aiRateLimiter, async (req, res) => {
       return res.status(500).json({ error: 'OpenAI API not configured' });
     }
     const response = await global.openai.images.generate({
-      model: "dall-e-3",
+      model: 'dall-e-3',
       prompt: `${prompt}, style: ${style}, high quality, professional`,
       n: 1,
-      size: "1024x1024",
-      quality: "hd"
+      size: '1024x1024',
+      quality: 'hd'
     });
     res.json({
       success: true,
@@ -654,7 +677,7 @@ app.use((err, req, res, next) => {
   logger.error('Server error', err);
   const statusCode = err.statusCode || 500;
   const errorResponse = {
-    error: statusCode >= 500 ? 'Internal server error' : (err.message || 'Bad request')
+    error: statusCode >= 500 ? 'Internal server error' : err.message || 'Bad request'
   };
   // Only expose stack trace in development
   if (process.env.NODE_ENV === 'development') {
@@ -670,7 +693,9 @@ app.use(errorTracking);
 // Optimized server info logging
 const logServerInfo = (port, dbConnected) => {
   const dbType = process.env.DATABASE_URL
-    ? (process.env.DATABASE_URL.startsWith('sqlite:') ? 'SQLite' : 'PostgreSQL')
+    ? process.env.DATABASE_URL.startsWith('sqlite:')
+      ? 'SQLite'
+      : 'PostgreSQL'
     : 'SQLite';
 
   logger.info('Viral Content Creator server started', {
@@ -688,13 +713,16 @@ const startServer = async () => {
     logger.info('Starting server initialization');
 
     // Initialize services in parallel where possible
-    const [dbConnected] = await Promise.all([
-      connectDB()
-    ]);
+    const [dbConnected] = await Promise.all([connectDB()]);
 
     // Warn loudly if running PostgreSQL config but defaulting to SQLite in prod
-    if (process.env.NODE_ENV === 'production' && (!process.env.DATABASE_URL || process.env.DATABASE_URL.startsWith('sqlite:'))) {
-      logger.warn('Production environment using SQLite — use a managed PostgreSQL (e.g., Neon) for multi-user workloads');
+    if (
+      process.env.NODE_ENV === 'production' &&
+      (!process.env.DATABASE_URL || process.env.DATABASE_URL.startsWith('sqlite:'))
+    ) {
+      logger.warn(
+        'Production environment using SQLite — use a managed PostgreSQL (e.g., Neon) for multi-user workloads'
+      );
     }
 
     const port = process.env.PORT || 5000;
@@ -703,11 +731,13 @@ const startServer = async () => {
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
           return await new Promise((resolve, reject) => {
-            const server = app.listen(portToUse, '0.0.0.0', () => {
-              logServerInfo(portToUse, dbConnected);
-              setupGracefulShutdown(server);
-              resolve(server);
-            }).on('error', reject);
+            const server = app
+              .listen(portToUse, '0.0.0.0', () => {
+                logServerInfo(portToUse, dbConnected);
+                setupGracefulShutdown(server);
+                resolve(server);
+              })
+              .on('error', reject);
           });
         } catch (err) {
           if (err.code === 'EADDRINUSE' && attempt < maxRetries) {
@@ -723,7 +753,6 @@ const startServer = async () => {
     };
 
     await startServerOnPort(port);
-
   } catch (error) {
     logger.error('Fatal error starting server', error);
     await gracefulCleanup();

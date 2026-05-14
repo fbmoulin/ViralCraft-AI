@@ -57,7 +57,6 @@ class DatabaseService {
 
       this.isConnected = true;
       return true;
-
     } catch (error) {
       console.error('❌ Database connection failed:', error.message);
 
@@ -102,14 +101,14 @@ class DatabaseService {
       // Check if migrations are already running
       if (this.isMigrating) {
         console.log('⏳ Migrations already in progress, waiting...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
         return true;
       }
 
       this.isMigrating = true;
 
       // Use logging: false to prevent SQL spam and alter: false to prevent loops
-      await this.sequelize.sync({ 
+      await this.sequelize.sync({
         alter: false,
         force: false,
         logging: false
@@ -126,90 +125,94 @@ class DatabaseService {
 
   defineModels(isSqlite) {
     // Content model
-    this.models.Content = this.sequelize.define('Content', {
-      id: {
-        type: DataTypes.UUID,
-        defaultValue: DataTypes.UUIDV4,
-        primaryKey: true
-      },
-      title: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        validate: {
-          notEmpty: true,
-          len: [1, 500]
-        }
-      },
-      type: {
-        type: DataTypes.ENUM(...config.content.contentTypes),
-        allowNull: false
-      },
-      platform: {
-        type: DataTypes.ENUM(...config.content.platforms, 'universal'),
-        allowNull: false
-      },
-      content: {
-        type: isSqlite ? DataTypes.TEXT : DataTypes.JSONB,
-        allowNull: false,
-        get() {
-          const value = this.getDataValue('content');
-          return typeof value === 'string' ? JSON.parse(value) : value;
+    this.models.Content = this.sequelize.define(
+      'Content',
+      {
+        id: {
+          type: DataTypes.UUID,
+          defaultValue: DataTypes.UUIDV4,
+          primaryKey: true
         },
-        set(value) {
-          this.setDataValue('content', isSqlite ? JSON.stringify(value) : value);
-        }
-      },
-      keywords: {
-        type: isSqlite ? DataTypes.TEXT : DataTypes.ARRAY(DataTypes.STRING),
-        defaultValue: isSqlite ? '[]' : [],
-        get() {
-          const value = this.getDataValue('keywords');
-          return typeof value === 'string' ? JSON.parse(value) : value;
+        title: {
+          type: DataTypes.STRING,
+          allowNull: false,
+          validate: {
+            notEmpty: true,
+            len: [1, 500]
+          }
         },
-        set(value) {
-          this.setDataValue('keywords', isSqlite ? JSON.stringify(value) : value);
-        }
-      },
-      metadata: {
-        type: isSqlite ? DataTypes.TEXT : DataTypes.JSONB,
-        defaultValue: isSqlite ? '{}' : {},
-        get() {
-          const value = this.getDataValue('metadata');
-          return typeof value === 'string' ? JSON.parse(value) : value;
+        type: {
+          type: DataTypes.ENUM(...config.content.contentTypes),
+          allowNull: false
         },
-        set(value) {
-          this.setDataValue('metadata', isSqlite ? JSON.stringify(value) : value);
+        platform: {
+          type: DataTypes.ENUM(...config.content.platforms, 'universal'),
+          allowNull: false
+        },
+        content: {
+          type: isSqlite ? DataTypes.TEXT : DataTypes.JSONB,
+          allowNull: false,
+          get() {
+            const value = this.getDataValue('content');
+            return typeof value === 'string' ? JSON.parse(value) : value;
+          },
+          set(value) {
+            this.setDataValue('content', isSqlite ? JSON.stringify(value) : value);
+          }
+        },
+        keywords: {
+          type: isSqlite ? DataTypes.TEXT : DataTypes.ARRAY(DataTypes.STRING),
+          defaultValue: isSqlite ? '[]' : [],
+          get() {
+            const value = this.getDataValue('keywords');
+            return typeof value === 'string' ? JSON.parse(value) : value;
+          },
+          set(value) {
+            this.setDataValue('keywords', isSqlite ? JSON.stringify(value) : value);
+          }
+        },
+        metadata: {
+          type: isSqlite ? DataTypes.TEXT : DataTypes.JSONB,
+          defaultValue: isSqlite ? '{}' : {},
+          get() {
+            const value = this.getDataValue('metadata');
+            return typeof value === 'string' ? JSON.parse(value) : value;
+          },
+          set(value) {
+            this.setDataValue('metadata', isSqlite ? JSON.stringify(value) : value);
+          }
+        },
+        viralScore: {
+          type: DataTypes.INTEGER,
+          defaultValue: 50,
+          validate: {
+            min: 0,
+            max: 100
+          }
+        },
+        status: {
+          type: DataTypes.ENUM('draft', 'published', 'scheduled', 'archived'),
+          defaultValue: 'draft'
+        },
+        userId: {
+          type: DataTypes.STRING,
+          allowNull: true
+        },
+        publishedAt: {
+          type: DataTypes.DATE,
+          allowNull: true
         }
       },
-      viralScore: {
-        type: DataTypes.INTEGER,
-        defaultValue: 50,
-        validate: {
-          min: 0,
-          max: 100
-        }
-      },
-      status: {
-        type: DataTypes.ENUM('draft', 'published', 'scheduled', 'archived'),
-        defaultValue: 'draft'
-      },
-      userId: {
-        type: DataTypes.STRING,
-        allowNull: true
-      },
-      publishedAt: {
-        type: DataTypes.DATE,
-        allowNull: true
+      {
+        indexes: [
+          { fields: ['platform'] },
+          { fields: ['type'] },
+          { fields: ['status'] },
+          { fields: ['viralScore'] },
+          { fields: ['createdAt'] }
+        ]
       }
-    }, {
-      indexes: [
-        { fields: ['platform'] },
-        { fields: ['type'] },
-        { fields: ['status'] },
-        { fields: ['viralScore'] },
-        { fields: ['createdAt'] }
-      ]
-    });
+    );
 
     // Analytics model
     this.models.Analytics = this.sequelize.define('Analytics', {
@@ -261,13 +264,13 @@ class DatabaseService {
     });
 
     // Define associations
-    this.models.Content.hasMany(this.models.Analytics, { 
-      foreignKey: 'contentId', 
-      as: 'analytics' 
+    this.models.Content.hasMany(this.models.Analytics, {
+      foreignKey: 'contentId',
+      as: 'analytics'
     });
-    this.models.Analytics.belongsTo(this.models.Content, { 
-      foreignKey: 'contentId', 
-      as: 'content' 
+    this.models.Analytics.belongsTo(this.models.Content, {
+      foreignKey: 'contentId',
+      as: 'content'
     });
   }
 
@@ -302,7 +305,7 @@ class DatabaseService {
         include
       });
 
-      return contents.map(content => content.toJSON());
+      return contents.map((content) => content.toJSON());
     } catch (error) {
       console.error('Database query error:', error);
       return [];
@@ -314,10 +317,12 @@ class DatabaseService {
 
     try {
       const content = await this.models.Content.findByPk(id, {
-        include: [{ 
-          model: this.models.Analytics, 
-          as: 'analytics' 
-        }]
+        include: [
+          {
+            model: this.models.Analytics,
+            as: 'analytics'
+          }
+        ]
       });
 
       return content ? content.toJSON() : null;
@@ -370,7 +375,7 @@ class DatabaseService {
         order: [['recordedAt', 'DESC']]
       });
 
-      return analytics.map(record => record.toJSON());
+      return analytics.map((record) => record.toJSON());
     } catch (error) {
       console.error('Database analytics error:', error);
       return [];
