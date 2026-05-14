@@ -53,14 +53,21 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const sub = event.data.object;
-        // Resolve planId by Stripe price ID lookup
+        // Resolve planId by Stripe price ID lookup. If we don't recognize the
+        // price (e.g. a new plan added in Stripe but not seeded locally), fall
+        // back to 'free' rather than violating the NOT NULL constraint.
         const plans = await global.db.listPlans();
         const matchingPlan = plans.find((p) => p.stripePriceId === sub.items?.data?.[0]?.price?.id);
-        const planId = matchingPlan ? matchingPlan.id : null;
+        if (!matchingPlan) {
+          logger.warn('Stripe webhook: no local plan matches Stripe price', {
+            stripePriceId: sub.items?.data?.[0]?.price?.id,
+            subscriptionId: sub.id
+          });
+        }
         await global.db.upsertSubscription({
           stripeSubscriptionId: sub.id,
           stripeCustomerId: sub.customer,
-          planId,
+          planId: matchingPlan ? matchingPlan.id : 'free',
           status: sub.status,
           currentPeriodEnd: sub.current_period_end ? new Date(sub.current_period_end * 1000) : null
         });
@@ -80,13 +87,10 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
 
       case 'invoice.payment_failed': {
         const invoice = event.data.object;
+        // Just flip the status to past_due — keep the existing plan so the user
+        // doesn't lose access mid-cycle while we wait for retry.
         if (invoice.subscription) {
-          await global.db.upsertSubscription({
-            stripeSubscriptionId: invoice.subscription,
-            stripeCustomerId: invoice.customer,
-            planId: null,
-            status: 'past_due'
-          });
+          await global.db.updateSubscriptionStatus(invoice.subscription, 'past_due');
         }
         break;
       }

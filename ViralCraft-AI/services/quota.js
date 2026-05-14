@@ -6,20 +6,38 @@ const DEFAULT_PLAN_ID = 'free';
  * Quota service — figures out which plan applies to a user/org, counts current
  * usage for the cycle, and records new usage events.
  *
- * Subscriptions are looked up first by org (when present), then by user. When
- * no active subscription exists, the user gets the Free plan defined in the
- * Plan table.
+ * Callers pass Clerk IDs (`clerkUserId`, `clerkOrgId`) because that's what they
+ * have on `req.auth`. Internally we translate to local UUIDs when we need to
+ * look up Subscriptions (which FK to User.id / Organization.id), and we use the
+ * Clerk IDs as-is for ApiUsage (which stores Clerk strings for ownership).
  */
 class QuotaService {
   get db() {
     return global.db;
   }
 
-  async resolvePlan({ userId, orgId }) {
+  async resolvePlan({ clerkUserId, clerkOrgId }) {
     if (!this.db || !this.db.isConnected) return null;
 
-    const sub = await this.db.findActiveSubscription({ userId, orgId });
-    if (sub && sub.plan) return sub.plan;
+    // Translate Clerk IDs → local UUIDs for Subscription lookup.
+    let localUserId = null;
+    let localOrgId = null;
+    if (clerkOrgId) {
+      const org = await this.db.findOrgByClerkId(clerkOrgId);
+      localOrgId = org?.id || null;
+    }
+    if (!localOrgId && clerkUserId) {
+      const user = await this.db.findUserByClerkId(clerkUserId);
+      localUserId = user?.id || null;
+    }
+
+    if (localUserId || localOrgId) {
+      const sub = await this.db.findActiveSubscription({
+        userId: localUserId,
+        orgId: localOrgId
+      });
+      if (sub && sub.plan) return sub.plan;
+    }
 
     const free = await this.db.getPlan(DEFAULT_PLAN_ID);
     if (!free) {
@@ -33,15 +51,22 @@ class QuotaService {
    * Returns { allowed, plan, used, limit, scope }. `scope` is either 'ai' or
    * 'image' depending on the endpoint.
    */
-  async checkQuota({ userId, orgId, isImage = false }) {
-    const plan = await this.resolvePlan({ userId, orgId });
+  async checkQuota({ clerkUserId, clerkOrgId, isImage = false }) {
+    const plan = await this.resolvePlan({ clerkUserId, clerkOrgId });
     if (!plan) return { allowed: false, reason: 'No plan available' };
 
     const limit = isImage ? plan.imageGenerations : plan.monthlyAiCalls;
-    if (limit < 0) return { allowed: true, plan, used: 0, limit, scope: isImage ? 'image' : 'ai' }; // unlimited sentinel
+    if (limit < 0) {
+      return { allowed: true, plan, used: 0, limit, scope: isImage ? 'image' : 'ai' };
+    }
 
     const since = monthStart();
-    const used = await this.db.countApiUsage({ userId, orgId, since, isImage });
+    const used = await this.db.countApiUsage({
+      userId: clerkUserId,
+      orgId: clerkOrgId,
+      since,
+      isImage
+    });
 
     return {
       allowed: used < limit,
@@ -54,8 +79,8 @@ class QuotaService {
   }
 
   async recordUsage({
-    userId,
-    orgId,
+    clerkUserId,
+    clerkOrgId,
     endpoint,
     model,
     tokensIn = 0,
@@ -66,8 +91,8 @@ class QuotaService {
     if (!this.db || !this.db.isConnected) return null;
     try {
       return await this.db.recordApiUsage({
-        userId,
-        orgId,
+        userId: clerkUserId,
+        orgId: clerkOrgId,
         endpoint,
         model,
         tokensIn,
@@ -81,11 +106,21 @@ class QuotaService {
     }
   }
 
-  async getCurrentUsage({ userId, orgId }) {
-    const plan = await this.resolvePlan({ userId, orgId });
+  async getCurrentUsage({ clerkUserId, clerkOrgId }) {
+    const plan = await this.resolvePlan({ clerkUserId, clerkOrgId });
     const since = monthStart();
-    const aiUsed = await this.db.countApiUsage({ userId, orgId, since, isImage: false });
-    const imageUsed = await this.db.countApiUsage({ userId, orgId, since, isImage: true });
+    const aiUsed = await this.db.countApiUsage({
+      userId: clerkUserId,
+      orgId: clerkOrgId,
+      since,
+      isImage: false
+    });
+    const imageUsed = await this.db.countApiUsage({
+      userId: clerkUserId,
+      orgId: clerkOrgId,
+      since,
+      isImage: true
+    });
     return {
       plan,
       cycleStart: since.toISOString(),

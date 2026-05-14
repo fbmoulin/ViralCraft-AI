@@ -1,4 +1,4 @@
-const { Sequelize, DataTypes } = require('sequelize');
+const { Sequelize, DataTypes, Op } = require('sequelize');
 const config = require('../config/app');
 
 class DatabaseService {
@@ -531,7 +531,7 @@ class DatabaseService {
   async findActiveSubscription({ userId, orgId }) {
     if (!this.isConnected) return null;
     const where = orgId ? { orgId } : { userId };
-    where.status = ['active', 'trialing', 'past_due'];
+    where.status = { [Op.in]: ['active', 'trialing', 'past_due'] };
     const sub = await this.models.Subscription.findOne({
       where,
       include: [{ model: this.models.Plan, as: 'plan' }],
@@ -542,15 +542,31 @@ class DatabaseService {
 
   async upsertSubscription({ stripeSubscriptionId, ...rest }) {
     if (!this.isConnected) return null;
-    const existing = stripeSubscriptionId
-      ? await this.models.Subscription.findOne({ where: { stripeSubscriptionId } })
-      : null;
-    if (existing) {
-      await existing.update(rest);
-      return existing.toJSON();
+    // Atomic upsert keyed on stripeSubscriptionId (unique). Falls through to
+    // a plain create when the field is missing, but that's a webhook bug we
+    // log loudly rather than handle silently.
+    if (!stripeSubscriptionId) {
+      const created = await this.models.Subscription.create(rest);
+      return created.toJSON();
     }
-    const created = await this.models.Subscription.create({ stripeSubscriptionId, ...rest });
-    return created.toJSON();
+    const [row] = await this.models.Subscription.upsert(
+      { stripeSubscriptionId, ...rest },
+      { returning: true, conflictFields: ['stripeSubscriptionId'] }
+    );
+    return row.toJSON();
+  }
+
+  /**
+   * Status-only update — used by invoice.payment_failed to mark a subscription
+   * past_due without touching planId, so the user retains access during retry.
+   */
+  async updateSubscriptionStatus(stripeSubscriptionId, status) {
+    if (!this.isConnected) return null;
+    const [updated] = await this.models.Subscription.update(
+      { status },
+      { where: { stripeSubscriptionId } }
+    );
+    return updated > 0;
   }
 
   async recordApiUsage(usage) {

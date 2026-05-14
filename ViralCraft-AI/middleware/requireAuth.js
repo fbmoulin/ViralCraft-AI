@@ -17,12 +17,23 @@ function extractBearer(req) {
  *   - req.auth.sessionId   — sid claim (if present)
  *   - req.user             — local User row (created on first hit)
  * Returns 401 when the token is missing or fails verification.
+ *
+ * All async work is wrapped in try/catch so any failure inside
+ * verifySessionToken or the DB lookup is forwarded to the global error
+ * handler instead of becoming an unhandled promise rejection.
  */
 async function requireAuth(req, res, next) {
   const token = extractBearer(req);
   if (!token) return next(createError('Missing Authorization header', 401));
 
-  const payload = await verifySessionToken(token);
+  let payload;
+  try {
+    payload = await verifySessionToken(token);
+  } catch (err) {
+    logger.warn('requireAuth: token verification threw', { error: err.message });
+    return next(createError('Invalid or expired session', 401));
+  }
+
   if (!payload || !payload.sub) {
     return next(createError('Invalid or expired session', 401));
   }
@@ -58,7 +69,17 @@ async function optionalAuth(req, res, next) {
   const token = extractBearer(req);
   if (!token) return next();
 
-  const payload = await verifySessionToken(token);
+  let payload = null;
+  try {
+    payload = await verifySessionToken(token);
+  } catch (err) {
+    // For optional auth, fail open: log and continue as anonymous.
+    logger.debug('optionalAuth: token verification threw, continuing as anon', {
+      error: err.message
+    });
+    return next();
+  }
+
   if (payload && payload.sub) {
     req.auth = {
       clerkUserId: payload.sub,

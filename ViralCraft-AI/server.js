@@ -128,7 +128,8 @@ const readRateLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: parseInt(process.env.READ_RATE_LIMIT_PER_MIN || '100', 10),
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please retry in a minute.' }
 });
 // Serve static files with caching headers
 const staticOptions = {
@@ -414,8 +415,8 @@ app.post(
       }
 
       await quota.recordUsage({
-        userId: req.auth.clerkUserId,
-        orgId: req.auth.orgId || null,
+        clerkUserId: req.auth.clerkUserId,
+        clerkOrgId: req.auth.orgId || null,
         endpoint: '/api/extract',
         model: 'gpt-4o',
         tokensIn: 0,
@@ -474,7 +475,7 @@ app.post('/api/generate', aiRateLimiter, requireAuth, enforceQuota(), async (req
           metadata: {
             tone,
             generatedAt: new Date(),
-            model: global.anthropic ? 'claude-3-sonnet' : global.openai ? 'gpt-4' : 'mock'
+            model: global.anthropic ? 'claude-haiku-4-5' : global.openai ? 'gpt-4o' : 'mock'
           }
         });
       }
@@ -484,8 +485,8 @@ app.post('/api/generate', aiRateLimiter, requireAuth, enforceQuota(), async (req
     }
 
     await quota.recordUsage({
-      userId: req.auth.clerkUserId,
-      orgId: req.auth.orgId || null,
+      clerkUserId: req.auth.clerkUserId,
+      clerkOrgId: req.auth.orgId || null,
       endpoint: '/api/generate',
       model: global.openai ? 'gpt-4o' : 'mock',
       tokensIn: result?.usage?.promptTokens || 0,
@@ -539,9 +540,10 @@ app.post('/api/suggest', aiRateLimiter, requireAuth, enforceQuota(), async (req,
 
     // Generate suggestion using available APIs
     if (global.anthropic) {
-      // Use Claude for suggestion
+      // Use Claude for suggestion. claude-3-haiku-20240307 was retired
+      // 2026-04-20; haiku-4-5 is the current recommended replacement.
       const response = await global.anthropic.messages.create({
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-haiku-4-5-20251001',
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
         max_tokens: 1000
@@ -589,10 +591,10 @@ app.post('/api/suggest', aiRateLimiter, requireAuth, enforceQuota(), async (req,
     }
 
     await quota.recordUsage({
-      userId: req.auth.clerkUserId,
-      orgId: req.auth.orgId || null,
+      clerkUserId: req.auth.clerkUserId,
+      clerkOrgId: req.auth.orgId || null,
       endpoint: '/api/suggest',
-      model: global.anthropic ? 'claude-3-haiku' : 'gpt-3.5-turbo'
+      model: global.anthropic ? 'claude-haiku-4-5' : 'gpt-3.5-turbo'
     });
 
     res.json({
@@ -654,8 +656,8 @@ app.post(
       });
 
       await quota.recordUsage({
-        userId: req.auth.clerkUserId,
-        orgId: req.auth.orgId || null,
+        clerkUserId: req.auth.clerkUserId,
+        clerkOrgId: req.auth.orgId || null,
         endpoint: '/api/generate-image',
         model: 'dall-e-3',
         isImage: true

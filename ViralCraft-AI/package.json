@@ -16,7 +16,7 @@
     "test:smoke": "node test-server.js",
     "setup-db": "node scripts/setup-db.js",
     "seed-plans": "node scripts/seed-plans.js",
-    "prepare": "cd .. && husky install ViralCraft-AI/.husky"
+    "prepare": "husky || true"
   },
   "lint-staged": {
     "*.js": [

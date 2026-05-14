@@ -44,18 +44,15 @@ async function verifySessionToken(token) {
   const client = getClerk();
   if (!client) return null;
 
-  try {
-    if (clerkSdk && clerkSdk.verifyToken) {
-      const payload = await clerkSdk.verifyToken(token, {
-        secretKey: process.env.CLERK_SECRET_KEY
-      });
-      return payload;
-    }
-    if (client.sessions && client.sessions.verifySession) {
-      // Older SDK shape — requires sessionId and token separately.
-      return null;
-    }
+  if (!clerkSdk || typeof clerkSdk.verifyToken !== 'function') {
+    logger.warn('Clerk: installed SDK does not expose verifyToken — upgrade @clerk/clerk-sdk-node');
     return null;
+  }
+
+  try {
+    return await clerkSdk.verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY
+    });
   } catch (err) {
     logger.warn('Clerk: token verification failed', { error: err.message });
     return null;

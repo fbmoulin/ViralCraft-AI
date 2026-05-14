@@ -27,8 +27,8 @@ router.get(
   asyncHandler(async (req, res) => {
     if (!req.user) throw createError('User not synchronized', 404);
     const usage = await quota.getCurrentUsage({
-      userId: req.auth.clerkUserId,
-      orgId: req.auth.orgId || null
+      clerkUserId: req.auth.clerkUserId,
+      clerkOrgId: req.auth.orgId || null
     });
     res.json({ success: true, usage });
   })
@@ -80,9 +80,16 @@ router.post(
     if (!getStripe()) throw createError('Billing not configured', 503);
     if (!req.user) throw createError('User not synchronized', 404);
 
+    // Translate Clerk org ID → local UUID for the Subscription lookup.
+    let localOrgId = null;
+    if (req.auth.orgId) {
+      const org = await global.db.findOrgByClerkId(req.auth.orgId);
+      localOrgId = org?.id || null;
+    }
+
     const sub = await global.db.findActiveSubscription({
-      userId: req.user.id,
-      orgId: req.auth.orgId ? req.auth.orgId : null
+      userId: localOrgId ? null : req.user.id,
+      orgId: localOrgId
     });
     if (!sub || !sub.stripeCustomerId) {
       throw createError('No active subscription found', 404);
