@@ -10,6 +10,10 @@ const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
 const config = require('./config/app');
 const logger = require('./utils/logger');
+const requestId = require('./middleware/requestId');
+const sentry = require('./services/sentry');
+const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
+const cache = require('./services/cache');
 const {
   systemMonitoring,
   requestLogging,
@@ -23,6 +27,13 @@ require('./utils/error-handler');
 // Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Sentry must be initialized BEFORE any other middleware so its requestHandler
+// can run first. No-op if SENTRY_DSN is not set.
+sentry.initialize(app);
+
+// Request ID first so subsequent logs and Sentry events can carry it.
+app.use(requestId);
 
 // Logging setup
 const morganFormat = process.env.NODE_ENV === 'production' ? 'combined' : 'dev';
@@ -533,20 +544,6 @@ app.post('/api/suggest', aiRateLimiter, async (req, res) => {
   }
 });
 
-// Get all content
-app.get('/api/content', async (req, res) => {
-  try {
-    if (!global.db || !global.db.isConnected) {
-      return res.status(404).json({ error: 'Database not connected' });
-    }
-    const contents = await global.db.getContent();
-    res.json({ success: true, contents });
-  } catch (error) {
-    logger.error('Error fetching content list', error);
-    res.status(500).json({ error: 'Error fetching content' });
-  }
-});
-
 // Real-time error monitoring
 app.get('/api/errors/realtime', readRateLimiter, async (req, res) => {
   try {
@@ -575,40 +572,6 @@ app.get('/api/errors/realtime', readRateLimiter, async (req, res) => {
   }
 });
 
-// Get content by ID
-app.get('/api/content/:id', async (req, res) => {
-  try {
-    if (!global.db || !global.db.isConnected) {
-      return res.status(404).json({ error: 'Database not connected' });
-    }
-    const content = await global.db.getContentById(req.params.id);
-    if (!content) {
-      return res.status(404).json({ error: 'Content not found' });
-    }
-    res.json({ success: true, content });
-  } catch (error) {
-    logger.error('Error fetching content by id', error);
-    res.status(500).json({ error: 'Error fetching content' });
-  }
-});
-
-// Update content
-app.put('/api/content/:id', async (req, res) => {
-  try {
-    if (!global.db || !global.db.isConnected) {
-      return res.status(404).json({ error: 'Database not connected' });
-    }
-    const updatedContent = await global.db.updateContent(req.params.id, req.body);
-    if (!updatedContent) {
-      return res.status(404).json({ error: 'Content not found' });
-    }
-    res.json({ success: true, content: updatedContent });
-  } catch (error) {
-    logger.error('Error updating content', error);
-    res.status(500).json({ error: 'Error updating content' });
-  }
-});
-
 // Generate image with DALL-E
 app.post('/api/generate-image', aiRateLimiter, async (req, res) => {
   try {
@@ -634,6 +597,14 @@ app.post('/api/generate-image', aiRateLimiter, async (req, res) => {
 });
 
 // Initialize routes with error handling
+try {
+  const contentRoutes = require('./routes/contentRoutes');
+  app.use('/api/content', contentRoutes);
+  logger.info('Content routes initialized');
+} catch (error) {
+  logger.error('Error initializing Content routes', error);
+}
+
 try {
   const youtubeRoutes = require('./routes/youtube-routes');
   app.use('/api/youtube', youtubeRoutes);
@@ -664,30 +635,22 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Catch-all route
+// 404 for unmatched API routes — sends JSON instead of falling through to SPA.
+app.use('/api', notFoundHandler);
+
+// SPA fallback for everything else.
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Request logging is already handled by morgan middleware above
+// Sentry error handler must come before our own (no-op if Sentry not configured).
+sentry.attachErrorHandler(app);
 
-// Enhanced error handling middleware
-// eslint-disable-next-line no-unused-vars
-app.use((err, req, res, next) => {
-  logger.error('Server error', err);
-  const statusCode = err.statusCode || 500;
-  const errorResponse = {
-    error: statusCode >= 500 ? 'Internal server error' : err.message || 'Bad request'
-  };
-  // Only expose stack trace in development
-  if (process.env.NODE_ENV === 'development') {
-    errorResponse.message = err.message;
-    errorResponse.stack = err.stack;
-  }
-  res.status(statusCode).json(errorResponse);
-});
+// Centralized error handler — logs with request ID, hides 5xx details in prod.
+app.use(errorHandler);
 
-// Error handling middleware (must be last)
+// Monitoring tracker (counts errors for /api/health). Runs after errorHandler
+// so it sees the resolved status code.
 app.use(errorTracking);
 
 // Optimized server info logging
@@ -713,7 +676,8 @@ const startServer = async () => {
     logger.info('Starting server initialization');
 
     // Initialize services in parallel where possible
-    const [dbConnected] = await Promise.all([connectDB()]);
+    const [dbConnected] = await Promise.all([connectDB(), cache.initialize()]);
+    logger.info('Cache backend', { backend: cache.getBackend() });
 
     // Warn loudly if running PostgreSQL config but defaulting to SQLite in prod
     if (
