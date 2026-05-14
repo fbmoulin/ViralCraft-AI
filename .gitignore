@@ -23,6 +23,12 @@ ViralCraft-AI/coverage/
 .env.local
 .env.*.local
 
+# Local databases (dev artifacts)
+*.db
+*.sqlite
+ViralCraft-AI/*.db
+ViralCraft-AI/*.sqlite
+
 # Build artifacts
 dist/
 build/
