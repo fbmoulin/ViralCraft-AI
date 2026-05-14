@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="clerk-publishable-key" content="" />
     <title>Viral Content Creator</title>
     <link
       rel="stylesheet"
@@ -352,5 +353,12 @@
         }
       });
     </script>
+
+    <!-- Auth widget (Clerk). Loads the Clerk JS SDK and exposes window.ViralAuth. -->
+    <div id="auth-widget-host" style="position: fixed; top: 12px; right: 12px; z-index: 9999">
+      <div id="clerk-user-button"></div>
+      <div id="clerk-sign-in" style="display: none"></div>
+    </div>
+    <script src="/static/js/auth.js" defer></script>
   </body>
 </html>

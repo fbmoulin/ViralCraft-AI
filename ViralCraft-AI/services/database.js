@@ -107,9 +107,12 @@ class DatabaseService {
 
       this.isMigrating = true;
 
-      // Use logging: false to prevent SQL spam and alter: false to prevent loops
+      // In non-production, allow auto-altering tables so new columns/indexes
+      // added by Sprint 4 (User/Org/Member, Content.orgId) propagate without a
+      // manual migration. Production should use a dedicated migration tool.
+      const alter = process.env.NODE_ENV !== 'production';
       await this.sequelize.sync({
-        alter: false,
+        alter,
         force: false,
         logging: false
       });
@@ -194,7 +197,13 @@ class DatabaseService {
           type: DataTypes.ENUM('draft', 'published', 'scheduled', 'archived'),
           defaultValue: 'draft'
         },
+        // Stores Clerk user IDs (e.g. "user_xxxxx") for ownership filtering.
         userId: {
+          type: DataTypes.STRING,
+          allowNull: true
+        },
+        // Optional Clerk organization ID when content belongs to a team.
+        orgId: {
           type: DataTypes.STRING,
           allowNull: true
         },
@@ -209,7 +218,9 @@ class DatabaseService {
           { fields: ['type'] },
           { fields: ['status'] },
           { fields: ['viralScore'] },
-          { fields: ['createdAt'] }
+          { fields: ['createdAt'] },
+          { fields: ['userId', 'createdAt'] },
+          { fields: ['orgId', 'createdAt'] }
         ]
       }
     );
@@ -263,6 +274,101 @@ class DatabaseService {
       }
     });
 
+    // ─── Multi-user / SaaS schema (Sprint 4) ──────────────────────────
+    this.models.User = this.sequelize.define(
+      'User',
+      {
+        id: {
+          type: DataTypes.UUID,
+          defaultValue: DataTypes.UUIDV4,
+          primaryKey: true
+        },
+        clerkUserId: {
+          type: DataTypes.STRING,
+          allowNull: false,
+          unique: true
+        },
+        email: {
+          type: DataTypes.STRING,
+          allowNull: false,
+          unique: true,
+          validate: { isEmail: true }
+        },
+        name: {
+          type: DataTypes.STRING,
+          allowNull: true
+        }
+      },
+      {
+        indexes: [{ fields: ['clerkUserId'] }, { fields: ['email'] }]
+      }
+    );
+
+    this.models.Organization = this.sequelize.define(
+      'Organization',
+      {
+        id: {
+          type: DataTypes.UUID,
+          defaultValue: DataTypes.UUIDV4,
+          primaryKey: true
+        },
+        clerkOrgId: {
+          type: DataTypes.STRING,
+          allowNull: false,
+          unique: true
+        },
+        name: {
+          type: DataTypes.STRING,
+          allowNull: false
+        },
+        slug: {
+          type: DataTypes.STRING,
+          allowNull: true
+        },
+        ownerId: {
+          type: DataTypes.UUID,
+          allowNull: false,
+          references: { model: this.models.User, key: 'id' }
+        }
+      },
+      {
+        indexes: [{ fields: ['clerkOrgId'] }, { fields: ['ownerId'] }]
+      }
+    );
+
+    this.models.OrganizationMember = this.sequelize.define(
+      'OrganizationMember',
+      {
+        id: {
+          type: DataTypes.UUID,
+          defaultValue: DataTypes.UUIDV4,
+          primaryKey: true
+        },
+        orgId: {
+          type: DataTypes.UUID,
+          allowNull: false,
+          references: { model: this.models.Organization, key: 'id' }
+        },
+        userId: {
+          type: DataTypes.UUID,
+          allowNull: false,
+          references: { model: this.models.User, key: 'id' }
+        },
+        role: {
+          type: DataTypes.ENUM('owner', 'admin', 'member'),
+          defaultValue: 'member',
+          allowNull: false
+        }
+      },
+      {
+        indexes: [
+          { fields: ['orgId'] },
+          { fields: ['userId'] },
+          { unique: true, fields: ['orgId', 'userId'] }
+        ]
+      }
+    );
+
     // Define associations
     this.models.Content.hasMany(this.models.Analytics, {
       foreignKey: 'contentId',
@@ -272,6 +378,85 @@ class DatabaseService {
       foreignKey: 'contentId',
       as: 'content'
     });
+
+    this.models.User.hasMany(this.models.OrganizationMember, {
+      foreignKey: 'userId',
+      as: 'memberships'
+    });
+    this.models.Organization.hasMany(this.models.OrganizationMember, {
+      foreignKey: 'orgId',
+      as: 'members'
+    });
+    this.models.OrganizationMember.belongsTo(this.models.User, {
+      foreignKey: 'userId',
+      as: 'user'
+    });
+    this.models.OrganizationMember.belongsTo(this.models.Organization, {
+      foreignKey: 'orgId',
+      as: 'organization'
+    });
+    this.models.User.hasMany(this.models.Organization, {
+      foreignKey: 'ownerId',
+      as: 'ownedOrganizations'
+    });
+  }
+
+  // ─── User / Organization helpers (Sprint 4) ────────────────────────
+  async upsertUser({ clerkUserId, email, name }) {
+    if (!this.isConnected) return null;
+    const [user] = await this.models.User.upsert({ clerkUserId, email, name }, { returning: true });
+    return user.toJSON();
+  }
+
+  async findUserByClerkId(clerkUserId) {
+    if (!this.isConnected) return null;
+    const user = await this.models.User.findOne({ where: { clerkUserId } });
+    return user ? user.toJSON() : null;
+  }
+
+  async deleteUserByClerkId(clerkUserId) {
+    if (!this.isConnected) return false;
+    const deleted = await this.models.User.destroy({ where: { clerkUserId } });
+    return deleted > 0;
+  }
+
+  async upsertOrganization({ clerkOrgId, name, slug, ownerId }) {
+    if (!this.isConnected) return null;
+    const [org] = await this.models.Organization.upsert(
+      { clerkOrgId, name, slug, ownerId },
+      { returning: true }
+    );
+    return org.toJSON();
+  }
+
+  async findOrgByClerkId(clerkOrgId) {
+    if (!this.isConnected) return null;
+    const org = await this.models.Organization.findOne({ where: { clerkOrgId } });
+    return org ? org.toJSON() : null;
+  }
+
+  async addOrgMember({ orgId, userId, role = 'member' }) {
+    if (!this.isConnected) return null;
+    const [member] = await this.models.OrganizationMember.upsert(
+      { orgId, userId, role },
+      { returning: true }
+    );
+    return member.toJSON();
+  }
+
+  async findMemberships(userId) {
+    if (!this.isConnected) return [];
+    const memberships = await this.models.OrganizationMember.findAll({
+      where: { userId },
+      include: [{ model: this.models.Organization, as: 'organization' }]
+    });
+    return memberships.map((m) => m.toJSON());
+  }
+
+  async assertMembership(userId, orgId) {
+    if (!this.isConnected) return null;
+    const member = await this.models.OrganizationMember.findOne({ where: { userId, orgId } });
+    return member ? member.toJSON() : null;
   }
 
   async createContent(data) {

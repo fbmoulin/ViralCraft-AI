@@ -95,6 +95,16 @@ app.use(
   })
 );
 
+// Webhooks need access to the raw body to verify signatures, so they MUST be
+// mounted before the express.json() middleware parses the body.
+try {
+  const clerkWebhookRouter = require('./routes/webhooks/clerk');
+  app.use('/api/webhooks/clerk', clerkWebhookRouter);
+  logger.info('Clerk webhook route initialized');
+} catch (error) {
+  logger.error('Error initializing Clerk webhook route', error);
+}
+
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
@@ -192,6 +202,15 @@ const connectDB = async () => {
     return false;
   }
 };
+
+// Public config — exposes only safe-to-publish keys for the frontend.
+app.get('/api/public-config', (req, res) => {
+  res.json({
+    clerkPublishableKey: process.env.CLERK_PUBLISHABLE_KEY || null,
+    stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || null,
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
 
 // API Routes
 // API Integration Test Endpoint
@@ -597,6 +616,22 @@ app.post('/api/generate-image', aiRateLimiter, async (req, res) => {
 });
 
 // Initialize routes with error handling
+try {
+  const authRoutes = require('./routes/authRoutes');
+  app.use('/api', authRoutes);
+  logger.info('Auth routes initialized');
+} catch (error) {
+  logger.error('Error initializing Auth routes', error);
+}
+
+try {
+  const orgRoutes = require('./routes/orgRoutes');
+  app.use('/api/orgs', orgRoutes);
+  logger.info('Org routes initialized');
+} catch (error) {
+  logger.error('Error initializing Org routes', error);
+}
+
 try {
   const contentRoutes = require('./routes/contentRoutes');
   app.use('/api/content', contentRoutes);
