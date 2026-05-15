@@ -56,9 +56,10 @@ router.get('/files', (req, res) => {
       });
     }
 
-    const files = fs.readdirSync(logsDir)
-      .filter(file => file.endsWith('.log'))
-      .map(file => {
+    const files = fs
+      .readdirSync(logsDir)
+      .filter((file) => file.endsWith('.log'))
+      .map((file) => {
         const filePath = path.join(logsDir, file);
         const stats = fs.statSync(filePath);
         return {

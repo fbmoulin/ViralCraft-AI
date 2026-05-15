@@ -43,9 +43,10 @@ class QueryOptimizerService {
   getStats() {
     return {
       ...this.stats,
-      hitRate: this.stats.totalQueries > 0 ? 
-        (this.stats.cacheHits / this.stats.totalQueries * 100).toFixed(2) + '%' : 
-        '0%'
+      hitRate:
+        this.stats.totalQueries > 0
+          ? ((this.stats.cacheHits / this.stats.totalQueries) * 100).toFixed(2) + '%'
+          : '0%'
     };
   }
 }

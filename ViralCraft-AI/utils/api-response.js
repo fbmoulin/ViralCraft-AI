@@ -1,4 +1,3 @@
-
 class ApiResponse {
   static success(data, message = 'Success') {
     return {
@@ -15,11 +14,11 @@ class ApiResponse {
       error: message,
       timestamp: new Date().toISOString()
     };
-    
+
     if (details) {
       response.details = details;
     }
-    
+
     return response;
   }
 

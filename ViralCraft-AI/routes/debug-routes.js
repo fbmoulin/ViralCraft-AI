@@ -1,8 +1,11 @@
-
 const express = require('express');
 const router = express.Router();
 const logger = require('../utils/logger');
 const { getHealthData } = require('../middleware/monitoring');
+const { requireDebugToken } = require('../middleware/requireDebugToken');
+
+// All debug/admin routes require token in production
+router.use(requireDebugToken);
 
 // Debug information endpoint
 router.get('/debug', (req, res) => {
@@ -13,14 +16,17 @@ router.get('/debug', (req, res) => {
         platform: process.platform,
         uptime: Math.floor(process.uptime()),
         pid: process.pid,
-        workingDirectory: process.cwd(),
         environment: process.env.NODE_ENV
       },
       memory: process.memoryUsage(),
       environment: {
         openaiConfigured: !!process.env.OPENAI_API_KEY,
         anthropicConfigured: !!process.env.ANTHROPIC_API_KEY,
-        databaseUrl: process.env.DATABASE_URL || 'SQLite (default)',
+        databaseType: process.env.DATABASE_URL
+          ? process.env.DATABASE_URL.startsWith('sqlite:')
+            ? 'sqlite'
+            : 'postgres'
+          : 'sqlite-default',
         logLevel: process.env.LOG_LEVEL || 'info'
       },
       health: getHealthData(),
@@ -35,10 +41,9 @@ router.get('/debug', (req, res) => {
     res.json({ success: true, debug: debugInfo });
   } catch (error) {
     logger.error('Debug endpoint error', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to gather debug information',
-      message: error.message 
+    res.status(500).json({
+      success: false,
+      error: 'Failed to gather debug information'
     });
   }
 });
@@ -47,7 +52,7 @@ router.get('/debug', (req, res) => {
 router.get('/test-ai', async (req, res) => {
   try {
     const aiService = require('../services/ai');
-    
+
     const testResults = {
       openai: {
         configured: !!process.env.OPENAI_API_KEY,
@@ -77,10 +82,9 @@ router.get('/test-ai', async (req, res) => {
     res.json({ success: true, tests: testResults });
   } catch (error) {
     logger.error('AI test endpoint error', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to test AI services',
-      message: error.message 
+    res.status(500).json({
+      success: false,
+      error: 'Failed to test AI services'
     });
   }
 });
@@ -93,10 +97,9 @@ router.post('/clear-logs', (req, res) => {
     res.json({ success: true, message: 'Logs cleared successfully' });
   } catch (error) {
     logger.error('Clear logs error', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to clear logs',
-      message: error.message 
+    res.status(500).json({
+      success: false,
+      error: 'Failed to clear logs'
     });
   }
 });
@@ -104,25 +107,24 @@ router.post('/clear-logs', (req, res) => {
 // Reinitialize AI service endpoint
 router.post('/reinit-ai', async (req, res) => {
   try {
-    console.log('🔄 Manual AI service reinitialization requested');
+    logger.info('Manual AI service reinitialization requested', { ip: req.ip });
     const aiService = require('../services/ai');
-    
+
     // Reset AI service state
     aiService.openai = null;
     aiService.initialized = false;
     aiService.fallbackMode = false;
-    
-    // Reinitialize
+
     const result = await aiService.initialize();
-    
-    logger.info('AI service reinitialization completed', { 
-      ip: req.ip, 
+
+    logger.info('AI service reinitialization completed', {
+      ip: req.ip,
       success: result,
-      fallbackMode: aiService.fallbackMode 
+      fallbackMode: aiService.fallbackMode
     });
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: 'AI service reinitialized',
       status: {
         openaiWorking: result && !aiService.fallbackMode,
@@ -132,10 +134,9 @@ router.post('/reinit-ai', async (req, res) => {
     });
   } catch (error) {
     logger.error('AI service reinitialization error', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to reinitialize AI service',
-      message: error.message 
+    res.status(500).json({
+      success: false,
+      error: 'Failed to reinitialize AI service'
     });
   }
 });

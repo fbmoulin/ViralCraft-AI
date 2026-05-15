@@ -1,4 +1,3 @@
-
 const databaseService = require('../services/database');
 
 // Middleware to ensure database connection
@@ -11,7 +10,7 @@ const ensureDatabaseConnection = async (req, res, next) => {
         global.db = databaseService;
       }
     }
-    
+
     // Add database to request context
     req.db = global.db;
     next();

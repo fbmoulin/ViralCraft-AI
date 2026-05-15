@@ -1,4 +1,3 @@
-
 const logger = require('./logger');
 
 // Global error handlers
@@ -32,7 +31,7 @@ module.exports = {
   handleAsync: (fn) => (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   },
-  
+
   createError: (message, statusCode = 500, details = null) => {
     const error = new Error(message);
     error.statusCode = statusCode;

@@ -1,4 +1,3 @@
-
 const logger = require('../utils/logger');
 const os = require('os');
 
@@ -7,29 +6,30 @@ const systemMonitoring = (req, res, next) => {
   // Track system resources
   const memUsage = process.memoryUsage();
   const cpuUsage = process.cpuUsage();
-  
+
   // Log high memory usage
-  if (memUsage.heapUsed > 500 * 1024 * 1024) { // 500MB
+  if (memUsage.heapUsed > 500 * 1024 * 1024) {
+    // 500MB
     logger.warn('High memory usage detected', {
       heapUsed: `${Math.round(memUsage.heapUsed / 1024 / 1024)}MB`,
       heapTotal: `${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`
     });
   }
-  
+
   // Add monitoring data to request
   req.monitoring = {
     startTime: Date.now(),
     memUsage,
     cpuUsage
   };
-  
+
   next();
 };
 
 // Request logging middleware
 const requestLogging = (req, res, next) => {
   const start = Date.now();
-  
+
   // Log request
   logger.info('Incoming request', {
     method: req.method,
@@ -37,12 +37,12 @@ const requestLogging = (req, res, next) => {
     userAgent: req.get('User-Agent'),
     ip: req.ip
   });
-  
+
   // Override res.end to log response
   const originalEnd = res.end;
-  res.end = function(...args) {
+  res.end = function (...args) {
     const duration = Date.now() - start;
-    
+
     logger.info('Request completed', {
       method: req.method,
       url: req.url,
@@ -50,7 +50,7 @@ const requestLogging = (req, res, next) => {
       duration: `${duration}ms`,
       ip: req.ip
     });
-    
+
     // Log slow requests
     if (duration > 5000) {
       logger.warn('Slow request detected', {
@@ -59,10 +59,10 @@ const requestLogging = (req, res, next) => {
         duration: `${duration}ms`
       });
     }
-    
+
     originalEnd.apply(this, args);
   };
-  
+
   next();
 };
 
@@ -74,7 +74,7 @@ const errorTracking = (err, req, res, next) => {
     userAgent: req.get('User-Agent'),
     ip: req.ip
   });
-  
+
   // Don't expose internal errors in production
   if (process.env.NODE_ENV === 'production') {
     res.status(500).json({
@@ -94,7 +94,7 @@ const errorTracking = (err, req, res, next) => {
 const getHealthData = () => {
   const stats = logger.getStats();
   const memUsage = process.memoryUsage();
-  
+
   return {
     status: 'healthy',
     uptime: Math.floor(process.uptime()),

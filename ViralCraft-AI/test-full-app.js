@@ -1,4 +1,3 @@
-
 #!/usr/bin/env node
 
 const fs = require('fs');
@@ -41,7 +40,7 @@ function runCommand(command, cwd = process.cwd()) {
 // Test 1: Syntax Validation
 async function testSyntax() {
   console.log('1️⃣ Testing JavaScript Syntax...');
-  
+
   const jsFiles = [
     'server.js',
     'utils/logger.js',
@@ -63,7 +62,11 @@ async function testSyntax() {
         console.log(`  ⚠️ ${file}: File not found`);
       }
     } catch (error) {
-      testResults.syntax.push({ file, status: 'FAIL', message: error.stderr || error.error.message });
+      testResults.syntax.push({
+        file,
+        status: 'FAIL',
+        message: error.stderr || error.error.message
+      });
       console.log(`  ❌ ${file}: ${error.stderr || error.error.message}`);
     }
   }
@@ -72,29 +75,44 @@ async function testSyntax() {
 // Test 2: Dependencies Check
 async function testDependencies() {
   console.log('\n2️⃣ Testing Dependencies...');
-  
+
   try {
     const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
     const dependencies = { ...packageJson.dependencies, ...packageJson.devDependencies };
-    
+
     console.log(`  📦 Checking ${Object.keys(dependencies).length} dependencies...`);
-    
+
     const result = await runCommand('npm ls --depth=0');
-    testResults.dependencies.push({ test: 'npm_ls', status: 'PASS', message: 'All dependencies installed' });
+    testResults.dependencies.push({
+      test: 'npm_ls',
+      status: 'PASS',
+      message: 'All dependencies installed'
+    });
     console.log('  ✅ All dependencies are properly installed');
-    
+
     // Check for vulnerabilities
     try {
       await runCommand('npm audit --audit-level moderate');
-      testResults.dependencies.push({ test: 'security', status: 'PASS', message: 'No critical vulnerabilities' });
+      testResults.dependencies.push({
+        test: 'security',
+        status: 'PASS',
+        message: 'No critical vulnerabilities'
+      });
       console.log('  ✅ No critical security vulnerabilities');
     } catch (auditError) {
-      testResults.dependencies.push({ test: 'security', status: 'WARN', message: 'Some vulnerabilities found' });
+      testResults.dependencies.push({
+        test: 'security',
+        status: 'WARN',
+        message: 'Some vulnerabilities found'
+      });
       console.log('  ⚠️ Some vulnerabilities found - run npm audit for details');
     }
-    
   } catch (error) {
-    testResults.dependencies.push({ test: 'npm_ls', status: 'FAIL', message: error.stderr || error.error.message });
+    testResults.dependencies.push({
+      test: 'npm_ls',
+      status: 'FAIL',
+      message: error.stderr || error.error.message
+    });
     console.log(`  ❌ Dependency check failed: ${error.stderr || error.error.message}`);
   }
 }
@@ -102,7 +120,7 @@ async function testDependencies() {
 // Test 3: File Structure
 async function testFileStructure() {
   console.log('\n3️⃣ Testing File Structure...');
-  
+
   const requiredFiles = [
     'package.json',
     'server.js',
@@ -114,14 +132,7 @@ async function testFileStructure() {
     'services/database.js'
   ];
 
-  const requiredDirs = [
-    'public',
-    'static',
-    'utils',
-    'services',
-    'routes',
-    'middleware'
-  ];
+  const requiredDirs = ['public', 'static', 'utils', 'services', 'routes', 'middleware'];
 
   // Check files
   for (const file of requiredFiles) {
@@ -151,25 +162,29 @@ async function testFileStructure() {
 // Test 4: Server Startup
 async function testServerStartup() {
   console.log('\n4️⃣ Testing Server Startup...');
-  
+
   try {
     console.log('  🚀 Starting server...');
-    
+
     // Start server in background
     const serverProcess = exec('node server.js', { cwd: __dirname });
-    
+
     // Wait for server to start
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
     // Test if server responds
     try {
       const response = await axios.get(`${testConfig.serverUrl}/api/health`, {
         timeout: testConfig.timeout
       });
-      
-      testResults.server.push({ test: 'startup', status: 'PASS', message: 'Server started successfully' });
+
+      testResults.server.push({
+        test: 'startup',
+        status: 'PASS',
+        message: 'Server started successfully'
+      });
       console.log('  ✅ Server started successfully');
-      
+
       // Test health endpoint
       if (response.data && response.data.status === 'ok') {
         testResults.server.push({ test: 'health', status: 'PASS', message: 'Health check passed' });
@@ -178,15 +193,13 @@ async function testServerStartup() {
         testResults.server.push({ test: 'health', status: 'FAIL', message: 'Health check failed' });
         console.log('  ❌ Health check failed');
       }
-      
     } catch (httpError) {
       testResults.server.push({ test: 'startup', status: 'FAIL', message: httpError.message });
       console.log(`  ❌ Server not responding: ${httpError.message}`);
     }
-    
+
     // Cleanup
     serverProcess.kill();
-    
   } catch (error) {
     testResults.server.push({ test: 'startup', status: 'FAIL', message: error.message });
     console.log(`  ❌ Server startup failed: ${error.message}`);
@@ -196,7 +209,7 @@ async function testServerStartup() {
 // Test 5: API Endpoints
 async function testAPIEndpoints() {
   console.log('\n5️⃣ Testing API Endpoints...');
-  
+
   const endpoints = [
     { path: '/api/health', method: 'GET', expected: 200 },
     { path: '/api/test-integration', method: 'GET', expected: 200 },
@@ -210,27 +223,29 @@ async function testAPIEndpoints() {
         url: `${testConfig.serverUrl}${endpoint.path}`,
         timeout: testConfig.timeout
       });
-      
+
       if (response.status === endpoint.expected) {
-        testResults.endpoints.push({ 
-          endpoint: `${endpoint.method} ${endpoint.path}`, 
-          status: 'PASS', 
-          code: response.status 
+        testResults.endpoints.push({
+          endpoint: `${endpoint.method} ${endpoint.path}`,
+          status: 'PASS',
+          code: response.status
         });
         console.log(`  ✅ ${endpoint.method} ${endpoint.path}: ${response.status}`);
       } else {
-        testResults.endpoints.push({ 
-          endpoint: `${endpoint.method} ${endpoint.path}`, 
-          status: 'FAIL', 
-          code: response.status 
+        testResults.endpoints.push({
+          endpoint: `${endpoint.method} ${endpoint.path}`,
+          status: 'FAIL',
+          code: response.status
         });
-        console.log(`  ❌ ${endpoint.method} ${endpoint.path}: Expected ${endpoint.expected}, got ${response.status}`);
+        console.log(
+          `  ❌ ${endpoint.method} ${endpoint.path}: Expected ${endpoint.expected}, got ${response.status}`
+        );
       }
     } catch (error) {
-      testResults.endpoints.push({ 
-        endpoint: `${endpoint.method} ${endpoint.path}`, 
-        status: 'FAIL', 
-        error: error.message 
+      testResults.endpoints.push({
+        endpoint: `${endpoint.method} ${endpoint.path}`,
+        status: 'FAIL',
+        error: error.message
       });
       console.log(`  ❌ ${endpoint.method} ${endpoint.path}: ${error.message}`);
     }
@@ -240,7 +255,7 @@ async function testAPIEndpoints() {
 // Generate test report
 function generateReport() {
   console.log('\n📊 Test Results Summary\n');
-  
+
   const totalTests = [
     ...testResults.syntax,
     ...testResults.dependencies,
@@ -248,17 +263,17 @@ function generateReport() {
     ...testResults.server,
     ...testResults.endpoints
   ];
-  
-  const passed = totalTests.filter(t => t.status === 'PASS').length;
-  const failed = totalTests.filter(t => t.status === 'FAIL').length;
-  const warnings = totalTests.filter(t => t.status === 'WARN').length;
-  const skipped = totalTests.filter(t => t.status === 'SKIP').length;
-  
+
+  const passed = totalTests.filter((t) => t.status === 'PASS').length;
+  const failed = totalTests.filter((t) => t.status === 'FAIL').length;
+  const warnings = totalTests.filter((t) => t.status === 'WARN').length;
+  const skipped = totalTests.filter((t) => t.status === 'SKIP').length;
+
   console.log(`✅ Passed: ${passed}`);
   console.log(`❌ Failed: ${failed}`);
   console.log(`⚠️ Warnings: ${warnings}`);
   console.log(`⏭️ Skipped: ${skipped}`);
-  
+
   if (failed === 0) {
     testResults.overall = 'PASS';
     console.log('\n🎉 All tests passed! The application is ready to run.');
@@ -267,9 +282,11 @@ function generateReport() {
     console.log('\n⚠️ Some tests failed, but the application may still work with limitations.');
   } else {
     testResults.overall = 'FAIL';
-    console.log('\n❌ Multiple test failures detected. The application needs fixes before running.');
+    console.log(
+      '\n❌ Multiple test failures detected. The application needs fixes before running.'
+    );
   }
-  
+
   // Save detailed report
   const reportPath = path.join(__dirname, 'test-report.json');
   fs.writeFileSync(reportPath, JSON.stringify(testResults, null, 2));
@@ -285,9 +302,8 @@ async function runFullTest() {
     await testServerStartup();
     // Note: Server endpoints test requires server to be running
     // await testAPIEndpoints();
-    
+
     generateReport();
-    
   } catch (error) {
     console.error('❌ Test runner failed:', error);
     process.exit(1);

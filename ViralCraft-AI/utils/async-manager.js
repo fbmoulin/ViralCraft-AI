@@ -1,4 +1,3 @@
-
 /**
  * Enhanced Async Manager for optimized asynchronous operations
  */
@@ -25,12 +24,7 @@ class OptimizedAsyncManager extends EventEmitter {
   }
 
   async executeWithRetry(operationId, operation, options = {}) {
-    const {
-      timeout = 10000,
-      retries = 3,
-      backoffMultiplier = 2,
-      priority = 0
-    } = options;
+    const { timeout = 10000, retries = 3, backoffMultiplier = 2, priority = 0 } = options;
 
     if (this.activeOperations.has(operationId)) {
       throw new Error(`Operation ${operationId} is already running`);
@@ -64,7 +58,6 @@ class OptimizedAsyncManager extends EventEmitter {
 
           this.recordSuccess(operationId, startTime);
           return result;
-
         } catch (error) {
           if (attempt === retries) {
             this.recordFailure(operationId, startTime, error);
@@ -76,7 +69,9 @@ class OptimizedAsyncManager extends EventEmitter {
             30000 // Max 30 seconds
           );
 
-          console.warn(`🔄 Retry ${attempt + 1}/${retries + 1} for ${operationId} after ${backoffTime}ms`);
+          console.warn(
+            `🔄 Retry ${attempt + 1}/${retries + 1} for ${operationId} after ${backoffTime}ms`
+          );
           await this.delay(backoffTime);
         }
       }
@@ -135,7 +130,7 @@ class OptimizedAsyncManager extends EventEmitter {
   recordSuccess(operationId, startTime) {
     const executionTime = Date.now() - startTime;
     this.executionTimes.push(executionTime);
-    
+
     // Maintain circular buffer for memory efficiency
     if (this.executionTimes.length > 1000) {
       this.executionTimes.shift();
@@ -152,11 +147,11 @@ class OptimizedAsyncManager extends EventEmitter {
     const executionTime = Date.now() - startTime;
     this.metrics.failedOperations++;
 
-    this.emit('operationCompleted', { 
-      operationId, 
-      executionTime, 
-      success: false, 
-      error: error.message 
+    this.emit('operationCompleted', {
+      operationId,
+      executionTime,
+      success: false,
+      error: error.message
     });
   }
 
@@ -168,7 +163,7 @@ class OptimizedAsyncManager extends EventEmitter {
   }
 
   delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   getActiveOperations() {
@@ -176,7 +171,7 @@ class OptimizedAsyncManager extends EventEmitter {
   }
 
   getQueuedOperations() {
-    return this.queue.map(item => ({
+    return this.queue.map((item) => ({
       operationId: item.operationId,
       priority: item.priority,
       queuedAt: new Date(item.timestamp)
@@ -188,9 +183,13 @@ class OptimizedAsyncManager extends EventEmitter {
       ...this.metrics,
       activeOperations: this.activeOperations.size,
       queuedOperations: this.queue.length,
-      concurrencyUtilization: (this.currentConcurrency / this.maxConcurrency * 100).toFixed(1) + '%',
-      successRate: this.metrics.totalOperations > 0 ? 
-        (this.metrics.successfulOperations / this.metrics.totalOperations * 100).toFixed(1) + '%' : '0%'
+      concurrencyUtilization:
+        ((this.currentConcurrency / this.maxConcurrency) * 100).toFixed(1) + '%',
+      successRate:
+        this.metrics.totalOperations > 0
+          ? ((this.metrics.successfulOperations / this.metrics.totalOperations) * 100).toFixed(1) +
+            '%'
+          : '0%'
     };
   }
 
@@ -207,7 +206,7 @@ class OptimizedAsyncManager extends EventEmitter {
     }
 
     // Remove from queue if present
-    const queueIndex = this.queue.findIndex(item => item.operationId === operationId);
+    const queueIndex = this.queue.findIndex((item) => item.operationId === operationId);
     if (queueIndex !== -1) {
       this.queue.splice(queueIndex, 1);
       this.emit('operationCancelled', { operationId });
@@ -243,15 +242,15 @@ class EnhancedWorkQueue extends EventEmitter {
 
   async add(task, options = {}) {
     return new Promise((resolve, reject) => {
-      this.queue.push({ 
-        task, 
-        resolve, 
-        reject, 
+      this.queue.push({
+        task,
+        resolve,
+        reject,
         priority: options.priority || 0,
         retries: options.retries ?? this.retries,
         timestamp: Date.now()
       });
-      
+
       this.sortQueue();
       this.process();
     });
@@ -298,7 +297,7 @@ class EnhancedWorkQueue extends EventEmitter {
         if (attempt === retries) {
           throw error;
         }
-        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+        await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
       }
     }
   }
@@ -326,8 +325,10 @@ class EnhancedWorkQueue extends EventEmitter {
       processed: this.processed,
       failed: this.failed,
       paused: this.paused,
-      successRate: this.processed > 0 ? 
-        ((this.processed / (this.processed + this.failed)) * 100).toFixed(1) + '%' : '0%'
+      successRate:
+        this.processed > 0
+          ? ((this.processed / (this.processed + this.failed)) * 100).toFixed(1) + '%'
+          : '0%'
     };
   }
 }
@@ -340,7 +341,7 @@ class OptimizedFileManager {
       retries: options.fileRetries || 2,
       onError: (error) => console.error('File operation error:', error)
     });
-    
+
     // Setup event handlers
     this.setupEventHandlers();
   }
@@ -416,22 +417,22 @@ class OptimizedFileManager {
       async () => {
         try {
           const items = await fs.readdir(dirPath, { withFileTypes: true });
-          
+
           if (options.recursive) {
             const results = [];
             for (const item of items) {
               const itemPath = path.join(dirPath, item.name);
               if (item.isDirectory()) {
                 const subItems = await this.readDirectory(itemPath, options);
-                results.push(...subItems.map(sub => path.join(item.name, sub)));
+                results.push(...subItems.map((sub) => path.join(item.name, sub)));
               } else {
                 results.push(item.name);
               }
             }
             return results;
           }
-          
-          return items.map(item => item.name);
+
+          return items.map((item) => item.name);
         } catch (error) {
           throw new Error(`Failed to read directory ${dirPath}: ${error.message}`);
         }
@@ -449,7 +450,7 @@ class OptimizedFileManager {
     return this.workQueue.add(async () => {
       const dir = path.dirname(destination);
       await fs.mkdir(dir, { recursive: true }).catch(() => {});
-      
+
       await fs.copyFile(source, destination);
       return { success: true, source, destination };
     }, options);
@@ -474,8 +475,10 @@ class OptimizedFileManager {
       }
     }
 
-    console.log(`✅ Batch operation completed: ${results.length} successful, ${errors.length} failed`);
-    
+    console.log(
+      `✅ Batch operation completed: ${results.length} successful, ${errors.length} failed`
+    );
+
     return {
       success: errors.length === 0,
       results,

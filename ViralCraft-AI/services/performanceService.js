@@ -1,4 +1,3 @@
-
 /**
  * Performance Service for monitoring application performance
  */
@@ -29,7 +28,7 @@ class PerformanceService {
         tokens: 0
       }
     };
-    
+
     this.startTime = Date.now();
     this.responseTimes = [];
     this.queryTimes = [];
@@ -38,33 +37,33 @@ class PerformanceService {
 
   recordRequest(responseTime, success = true) {
     this.metrics.requests.total++;
-    
+
     if (success) {
       this.metrics.requests.successful++;
     } else {
       this.metrics.requests.failed++;
     }
-    
+
     // Track response times with circular buffer for better memory efficiency
     this.responseTimes.push(responseTime);
     if (this.responseTimes.length > 100) {
       this.responseTimes.shift();
     }
-    
+
     // Use more efficient average calculation
     const sum = this.responseTimes.reduce((a, b) => a + b, 0);
     this.metrics.requests.averageResponseTime = Math.round(sum / this.responseTimes.length);
-    
+
     // Trigger cleanup if memory usage is high
     if (this.metrics.requests.total % 1000 === 0) {
       this.cleanupMetrics();
     }
   }
-  
+
   cleanupMetrics() {
     // Enhanced cleanup with circular buffer optimization
     const maxSamples = 100;
-    
+
     if (this.responseTimes.length > maxSamples) {
       this.responseTimes = this.responseTimes.slice(-maxSamples);
     }
@@ -74,7 +73,7 @@ class PerformanceService {
     if (this.aiResponseTimes.length > maxSamples) {
       this.aiResponseTimes = this.aiResponseTimes.slice(-maxSamples);
     }
-    
+
     // Force garbage collection hint
     if (global.gc && this.metrics.requests.total % 5000 === 0) {
       try {
@@ -88,34 +87,34 @@ class PerformanceService {
 
   recordDatabaseQuery(queryTime, success = true) {
     this.metrics.database.queries++;
-    
+
     if (!success) {
       this.metrics.database.errors++;
     }
-    
+
     this.queryTimes.push(queryTime);
     if (this.queryTimes.length > 100) {
       this.queryTimes.shift();
     }
-    
-    this.metrics.database.averageQueryTime = 
+
+    this.metrics.database.averageQueryTime =
       this.queryTimes.reduce((a, b) => a + b, 0) / this.queryTimes.length;
   }
 
   recordAIRequest(responseTime, tokens = 0, success = true) {
     this.metrics.ai.requests++;
     this.metrics.ai.tokens += tokens;
-    
+
     if (!success) {
       this.metrics.ai.errors++;
     }
-    
+
     this.aiResponseTimes.push(responseTime);
     if (this.aiResponseTimes.length > 50) {
       this.aiResponseTimes.shift();
     }
-    
-    this.metrics.ai.averageResponseTime = 
+
+    this.metrics.ai.averageResponseTime =
       this.aiResponseTimes.reduce((a, b) => a + b, 0) / this.aiResponseTimes.length;
   }
 
@@ -130,7 +129,7 @@ class PerformanceService {
 
   getMetrics() {
     this.updateMemoryMetrics();
-    
+
     return {
       ...this.metrics,
       uptime: Math.floor((Date.now() - this.startTime) / 1000), // seconds
@@ -141,26 +140,26 @@ class PerformanceService {
 
   calculateHealthScore() {
     let score = 100;
-    
+
     // Penalize for high error rate
     const errorRate = this.metrics.requests.failed / Math.max(this.metrics.requests.total, 1);
     if (errorRate > 0.05) score -= 20; // > 5% error rate
     if (errorRate > 0.1) score -= 30; // > 10% error rate
-    
+
     // Penalize for slow response times
     if (this.metrics.requests.averageResponseTime > 2000) score -= 15; // > 2s
     if (this.metrics.requests.averageResponseTime > 5000) score -= 25; // > 5s
-    
+
     // Penalize for high memory usage
     if (this.metrics.memory.heapUsed > 500) score -= 10; // > 500MB
     if (this.metrics.memory.heapUsed > 1000) score -= 20; // > 1GB
-    
+
     return Math.max(0, score);
   }
 
   getHealthStatus() {
     const score = this.calculateHealthScore();
-    
+
     if (score >= 80) return 'healthy';
     if (score >= 60) return 'warning';
     return 'critical';
@@ -173,7 +172,7 @@ class PerformanceService {
       database: { queries: 0, averageQueryTime: 0, errors: 0 },
       ai: { requests: 0, averageResponseTime: 0, errors: 0, tokens: 0 }
     };
-    
+
     this.responseTimes = [];
     this.queryTimes = [];
     this.aiResponseTimes = [];
@@ -183,7 +182,11 @@ class PerformanceService {
   getServiceHealth() {
     return {
       database: global.db ? (global.db.isConnected ? 'healthy' : 'disconnected') : 'not_configured',
-      ai: global.aiService ? (global.aiService.fallbackMode ? 'fallback' : 'healthy') : 'not_configured',
+      ai: global.aiService
+        ? global.aiService.fallbackMode
+          ? 'fallback'
+          : 'healthy'
+        : 'not_configured',
       cache: 'healthy',
       overall: this.getHealthStatus()
     };
@@ -191,7 +194,7 @@ class PerformanceService {
 
   async runHealthChecks() {
     const checks = {};
-    
+
     // Database health
     if (global.db && global.db.isConnected) {
       try {
@@ -203,7 +206,7 @@ class PerformanceService {
     } else {
       checks.database = { status: 'disconnected' };
     }
-    
+
     // AI service health
     if (global.aiService) {
       checks.ai = {
@@ -213,14 +216,14 @@ class PerformanceService {
     } else {
       checks.ai = { status: 'not_configured' };
     }
-    
+
     // Memory health
     const memUsage = process.memoryUsage();
     checks.memory = {
       status: memUsage.heapUsed > 1024 * 1024 * 1024 ? 'warning' : 'healthy', // 1GB threshold
       usage: Math.round(memUsage.heapUsed / 1024 / 1024) + 'MB'
     };
-    
+
     return checks;
   }
 }

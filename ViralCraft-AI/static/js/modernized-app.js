@@ -1,4 +1,3 @@
-
 /**
  * Modernized App - Optimized Frontend Application
  * Enhanced with performance optimizations, better error handling, and improved UX
@@ -72,8 +71,10 @@ class PerformanceManager {
       ...this.metrics,
       uptime: Math.round(performance.now() - this.startTime),
       cacheSize: this.cache.size,
-      hitRate: this.metrics.apiCalls > 0 ? 
-        (this.metrics.cacheHits / this.metrics.apiCalls * 100).toFixed(1) + '%' : '0%'
+      hitRate:
+        this.metrics.apiCalls > 0
+          ? ((this.metrics.cacheHits / this.metrics.apiCalls) * 100).toFixed(1) + '%'
+          : '0%'
     };
   }
 }
@@ -87,7 +88,7 @@ class APIClient {
 
   async request(endpoint, options = {}) {
     const requestKey = `${endpoint}-${JSON.stringify(options)}`;
-    
+
     // Check cache first
     if (APP_CONFIG.cache.enabled && options.method !== 'POST') {
       const cached = this.performance.getCache(requestKey);
@@ -107,7 +108,7 @@ class APIClient {
 
     try {
       const result = await requestPromise;
-      
+
       // Cache successful GET requests
       if (APP_CONFIG.cache.enabled && options.method !== 'POST' && result.success) {
         this.performance.setCache(requestKey, result);
@@ -150,16 +151,17 @@ class APIClient {
         }
 
         const data = await response.json();
-        
+
         console.log(`✅ API Success: ${endpoint} (${Math.round(performance.now() - startTime)}ms)`);
         return data;
-
       } catch (error) {
         console.warn(`⚠️ API Attempt ${attempt} failed:`, error.message);
-        
+
         if (attempt === APP_CONFIG.api.retries) {
           this.performance.recordMetric('errors');
-          throw new Error(`Request failed after ${APP_CONFIG.api.retries} attempts: ${error.message}`);
+          throw new Error(
+            `Request failed after ${APP_CONFIG.api.retries} attempts: ${error.message}`
+          );
         }
 
         // Exponential backoff
@@ -173,7 +175,7 @@ class APIClient {
   }
 
   delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   getMetrics() {
@@ -188,7 +190,7 @@ class UIManager {
     this.activeAnimations = new Set();
     this.debounceTimers = new Map();
     this.observers = new Map();
-    
+
     this.init();
   }
 
@@ -196,7 +198,7 @@ class UIManager {
     this.setupEventListeners();
     this.initializeObservers();
     this.startPerformanceMonitoring();
-    
+
     console.log('🎯 UI Manager initialized with optimizations');
   }
 
@@ -206,7 +208,7 @@ class UIManager {
     this.setupTabNavigation();
     this.setupFileUpload();
     this.setupTooltips();
-    
+
     // Global error handling
     window.addEventListener('error', this.handleGlobalError.bind(this));
     window.addEventListener('unhandledrejection', this.handleUnhandledRejection.bind(this));
@@ -217,19 +219,28 @@ class UIManager {
     const suggestBtn = document.getElementById('suggest-btn');
 
     if (generateForm) {
-      generateForm.addEventListener('submit', this.debounce(this.handleGenerate.bind(this), APP_CONFIG.performance.debounceDelay));
+      generateForm.addEventListener(
+        'submit',
+        this.debounce(this.handleGenerate.bind(this), APP_CONFIG.performance.debounceDelay)
+      );
     }
 
     if (suggestBtn) {
-      suggestBtn.addEventListener('click', this.debounce(this.handleSuggest.bind(this), APP_CONFIG.performance.debounceDelay));
+      suggestBtn.addEventListener(
+        'click',
+        this.debounce(this.handleSuggest.bind(this), APP_CONFIG.performance.debounceDelay)
+      );
     }
 
     // Auto-save functionality
     const inputs = generateForm?.querySelectorAll('input, textarea, select');
-    inputs?.forEach(input => {
-      input.addEventListener('input', this.debounce(() => {
-        this.autoSave(input);
-      }, 1000));
+    inputs?.forEach((input) => {
+      input.addEventListener(
+        'input',
+        this.debounce(() => {
+          this.autoSave(input);
+        }, 1000)
+      );
     });
   }
 
@@ -237,7 +248,7 @@ class UIManager {
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabContents = document.querySelectorAll('.tab-content');
 
-    tabButtons.forEach(button => {
+    tabButtons.forEach((button) => {
       button.addEventListener('click', (e) => {
         e.preventDefault();
         const targetTab = button.dataset.tab;
@@ -254,7 +265,7 @@ class UIManager {
       // Drag and drop
       dropZone.addEventListener('dragover', this.handleDragOver.bind(this));
       dropZone.addEventListener('drop', this.handleDrop.bind(this));
-      
+
       // File input change
       fileInput.addEventListener('change', this.handleFileSelect.bind(this));
     }
@@ -262,9 +273,9 @@ class UIManager {
 
   async handleGenerate(e) {
     e.preventDefault();
-    
+
     const loadingId = this.showLoading('Gerando conteúdo otimizado...');
-    
+
     try {
       const formData = this.collectFormData(e.target);
       const response = await this.apiClient.request('/api/generate', {
@@ -278,7 +289,6 @@ class UIManager {
       } else {
         throw new Error(response.error || 'Erro desconhecido');
       }
-
     } catch (error) {
       console.error('Erro na geração:', error);
       this.showNotification(`❌ Erro: ${error.message}`, 'error');
@@ -290,9 +300,9 @@ class UIManager {
 
   async handleSuggest(e) {
     e.preventDefault();
-    
+
     const loadingId = this.showLoading('Gerando sugestões...');
-    
+
     try {
       const formData = this.collectFormData(document.getElementById('generate-form'));
       const response = await this.apiClient.request('/api/suggest', {
@@ -306,7 +316,6 @@ class UIManager {
       } else {
         throw new Error(response.error || 'Erro ao gerar sugestões');
       }
-
     } catch (error) {
       console.error('Erro na sugestão:', error);
       this.showNotification(`❌ Erro: ${error.message}`, 'error');
@@ -318,15 +327,18 @@ class UIManager {
   collectFormData(form) {
     const formData = new FormData(form);
     const data = {};
-    
+
     for (const [key, value] of formData.entries()) {
       if (key === 'keywords') {
-        data[key] = value.split(',').map(k => k.trim()).filter(k => k);
+        data[key] = value
+          .split(',')
+          .map((k) => k.trim())
+          .filter((k) => k);
       } else {
         data[key] = value;
       }
     }
-    
+
     return data;
   }
 
@@ -335,7 +347,9 @@ class UIManager {
     if (!resultsContainer) return;
 
     // Create optimized HTML structure
-    const html = Object.entries(content).map(([platform, platformContent]) => `
+    const html = Object.entries(content)
+      .map(
+        ([platform, platformContent]) => `
       <div class="result-card" data-platform="${platform}">
         <div class="result-header">
           <h3>${this.formatPlatformName(platform)}</h3>
@@ -352,37 +366,56 @@ class UIManager {
           <pre>${this.escapeHtml(platformContent)}</pre>
         </div>
       </div>
-    `).join('');
+    `
+      )
+      .join('');
 
     resultsContainer.innerHTML = html;
-    
+
     // Setup result actions
     this.setupResultActions(resultsContainer);
-    
+
     // Animate appearance
     this.animateIn(resultsContainer);
   }
 
   displaySuggestion(suggestion) {
-    const container = document.getElementById('suggestion-container') || this.createSuggestionContainer();
-    
+    const container =
+      document.getElementById('suggestion-container') || this.createSuggestionContainer();
+
     const html = `
       <div class="suggestion-card">
         <h3>💡 Sugestões Geradas</h3>
-        ${suggestion.title ? `<div class="suggestion-item">
+        ${
+          suggestion.title
+            ? `<div class="suggestion-item">
           <strong>Título:</strong> ${this.escapeHtml(suggestion.title)}
-        </div>` : ''}
-        ${suggestion.outline ? `<div class="suggestion-item">
+        </div>`
+            : ''
+        }
+        ${
+          suggestion.outline
+            ? `<div class="suggestion-item">
           <strong>Estrutura:</strong>
           <pre>${this.escapeHtml(suggestion.outline)}</pre>
-        </div>` : ''}
-        ${suggestion.hook ? `<div class="suggestion-item">
+        </div>`
+            : ''
+        }
+        ${
+          suggestion.hook
+            ? `<div class="suggestion-item">
           <strong>Hook:</strong> ${this.escapeHtml(suggestion.hook)}
-        </div>` : ''}
-        ${suggestion.content ? `<div class="suggestion-item">
+        </div>`
+            : ''
+        }
+        ${
+          suggestion.content
+            ? `<div class="suggestion-item">
           <strong>Sugestão Completa:</strong>
           <pre>${this.escapeHtml(suggestion.content)}</pre>
-        </div>` : ''}
+        </div>`
+            : ''
+        }
         <div class="suggestion-actions">
           <button class="apply-suggestion-btn">✅ Aplicar Sugestão</button>
           <button class="dismiss-suggestion-btn">❌ Dispensar</button>
@@ -397,7 +430,7 @@ class UIManager {
 
   setupResultActions(container) {
     // Copy buttons
-    container.querySelectorAll('.copy-btn').forEach(btn => {
+    container.querySelectorAll('.copy-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         const content = btn.dataset.content;
         this.copyToClipboard(content);
@@ -405,7 +438,7 @@ class UIManager {
     });
 
     // Download buttons
-    container.querySelectorAll('.download-btn').forEach(btn => {
+    container.querySelectorAll('.download-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         const content = btn.dataset.content;
         const platform = btn.dataset.platform;
@@ -428,14 +461,14 @@ class UIManager {
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    
+
     a.href = url;
     a.download = `content-${platform}-${Date.now()}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
+
     this.showNotification('💾 Download iniciado!', 'success');
   }
 
@@ -450,10 +483,10 @@ class UIManager {
         <p>${message}</p>
       </div>
     `;
-    
+
     document.body.appendChild(loadingEl);
     requestAnimationFrame(() => loadingEl.classList.add('show'));
-    
+
     return id;
   }
 
@@ -473,13 +506,13 @@ class UIManager {
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
     notification.textContent = message;
-    
+
     document.body.appendChild(notification);
-    
+
     requestAnimationFrame(() => {
       notification.classList.add('show');
     });
-    
+
     setTimeout(() => {
       notification.classList.remove('show');
       setTimeout(() => {
@@ -495,7 +528,10 @@ class UIManager {
     return (...args) => {
       const key = func.toString();
       clearTimeout(this.debounceTimers.get(key));
-      this.debounceTimers.set(key, setTimeout(() => func.apply(this, args), wait));
+      this.debounceTimers.set(
+        key,
+        setTimeout(() => func.apply(this, args), wait)
+      );
     };
   }
 
@@ -519,7 +555,7 @@ class UIManager {
   animateIn(element) {
     element.style.opacity = '0';
     element.style.transform = 'translateY(20px)';
-    
+
     requestAnimationFrame(() => {
       element.style.transition = `opacity ${APP_CONFIG.performance.animationDuration}ms ease, transform ${APP_CONFIG.performance.animationDuration}ms ease`;
       element.style.opacity = '1';
@@ -529,12 +565,12 @@ class UIManager {
 
   switchTab(targetTab, tabButtons, tabContents) {
     // Update buttons
-    tabButtons.forEach(btn => btn.classList.remove('active'));
+    tabButtons.forEach((btn) => btn.classList.remove('active'));
     const activeBtn = document.querySelector(`[data-tab="${targetTab}"]`);
     if (activeBtn) activeBtn.classList.add('active');
 
     // Update content
-    tabContents.forEach(content => {
+    tabContents.forEach((content) => {
       content.classList.remove('active');
       if (content.id === targetTab) {
         content.classList.add('active');
@@ -553,7 +589,7 @@ class UIManager {
     if (!form) return;
 
     const inputs = form.querySelectorAll('input, textarea, select');
-    inputs.forEach(input => {
+    inputs.forEach((input) => {
       const key = `autosave_${input.name || input.id}`;
       const saved = localStorage.getItem(key);
       if (saved && !input.value) {
@@ -575,15 +611,15 @@ class UIManager {
   initializeObservers() {
     // Intersection Observer for lazy loading
     if ('IntersectionObserver' in window) {
-      this.observers.set('lazyLoad', new IntersectionObserver(
-        this.handleLazyLoad.bind(this),
-        { threshold: 0.1 }
-      ));
+      this.observers.set(
+        'lazyLoad',
+        new IntersectionObserver(this.handleLazyLoad.bind(this), { threshold: 0.1 })
+      );
     }
   }
 
   handleLazyLoad(entries) {
-    entries.forEach(entry => {
+    entries.forEach((entry) => {
       if (entry.isIntersecting) {
         const element = entry.target;
         // Implement lazy loading logic
@@ -612,7 +648,7 @@ class UIManager {
     e.preventDefault();
     e.stopPropagation();
     e.currentTarget.classList.remove('drag-over');
-    
+
     const files = Array.from(e.dataTransfer.files);
     this.processFiles(files);
   }
@@ -635,13 +671,13 @@ class UIManager {
   isValidFile(file) {
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'text/plain'];
     const maxSize = 10 * 1024 * 1024; // 10MB
-    
+
     return validTypes.includes(file.type) && file.size <= maxSize;
   }
 
   async uploadFile(file) {
     const loadingId = this.showLoading(`Processando ${file.name}...`);
-    
+
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -657,14 +693,13 @@ class UIManager {
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         this.populateExtractedData(data.data);
         this.showNotification('✅ Arquivo processado com sucesso!', 'success');
       } else {
         throw new Error(data.error);
       }
-
     } catch (error) {
       console.error('Erro no upload:', error);
       this.showNotification(`❌ Erro ao processar arquivo: ${error.message}`, 'error');
@@ -707,12 +742,12 @@ class UIManager {
     const container = document.createElement('div');
     container.id = 'suggestion-container';
     container.className = 'suggestion-container';
-    
+
     const resultsSection = document.getElementById('results')?.parentNode;
     if (resultsSection) {
       resultsSection.insertBefore(container, document.getElementById('results'));
     }
-    
+
     return container;
   }
 
@@ -737,7 +772,7 @@ class UIManager {
 
   setupTooltips() {
     const tooltipElements = document.querySelectorAll('[data-tooltip]');
-    tooltipElements.forEach(el => {
+    tooltipElements.forEach((el) => {
       el.addEventListener('mouseenter', this.showTooltip.bind(this));
       el.addEventListener('mouseleave', this.hideTooltip.bind(this));
     });
@@ -753,7 +788,7 @@ class UIManager {
     document.body.appendChild(tooltip);
 
     const rect = e.target.getBoundingClientRect();
-    tooltip.style.left = rect.left + (rect.width / 2) - (tooltip.offsetWidth / 2) + 'px';
+    tooltip.style.left = rect.left + rect.width / 2 - tooltip.offsetWidth / 2 + 'px';
     tooltip.style.top = rect.top - tooltip.offsetHeight - 5 + 'px';
 
     e.target._tooltip = tooltip;
@@ -777,7 +812,7 @@ window.debugApp = {
       version: '2.0.0-optimized'
     };
   },
-  
+
   testAI: async () => {
     try {
       const response = await fetch('/api/test-integration');
@@ -789,7 +824,7 @@ window.debugApp = {
       return { error: error.message };
     }
   },
-  
+
   clearCache: () => {
     if (window.uiManager?.apiClient?.performance) {
       window.uiManager.apiClient.performance.cache.clear();
@@ -808,15 +843,17 @@ let uiManager;
 
 function initializeApp() {
   console.log('🚀 Initializing optimized ViralCraft-AI...');
-  
+
   uiManager = new UIManager();
   window.uiManager = uiManager;
-  
+
   // Load auto-saved data
   uiManager.loadAutoSaved();
-  
+
   console.log('✅ Application initialized successfully');
-  console.log('🔧 Debug commands available: debugApp.getInfo(), debugApp.testAI(), debugApp.clearCache()');
+  console.log(
+    '🔧 Debug commands available: debugApp.getInfo(), debugApp.testAI(), debugApp.clearCache()'
+  );
 }
 
 // Start app when DOM is ready

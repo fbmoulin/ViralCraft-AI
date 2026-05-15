@@ -50,7 +50,7 @@ function initializeNavigation() {
   const tabButtons = document.querySelectorAll('.tab-button');
   const tabContents = document.querySelectorAll('.tab-content');
 
-  tabButtons.forEach(button => {
+  tabButtons.forEach((button) => {
     button.addEventListener('click', (e) => {
       e.preventDefault();
       const targetTab = button.dataset.tab;
@@ -61,8 +61,8 @@ function initializeNavigation() {
 
 function switchToTab(targetTab, tabButtons, tabContents) {
   // Remove active class from all tabs
-  tabButtons.forEach(btn => btn.classList.remove('active'));
-  tabContents.forEach(content => content.classList.remove('active'));
+  tabButtons.forEach((btn) => btn.classList.remove('active'));
+  tabContents.forEach((content) => content.classList.remove('active'));
 
   // Add active class to target tab
   const targetButton = document.querySelector(`[data-tab="${targetTab}"]`);
@@ -77,18 +77,21 @@ function switchToTab(targetTab, tabButtons, tabContents) {
 function initializeFormHandling() {
   const forms = document.querySelectorAll('form');
 
-  forms.forEach(form => {
+  forms.forEach((form) => {
     form.addEventListener('submit', handleFormSubmit);
 
     // Add real-time validation
     const inputs = form.querySelectorAll('input, textarea, select');
-    inputs.forEach(input => {
+    inputs.forEach((input) => {
       input.addEventListener('blur', () => validateField(input));
-      input.addEventListener('input', debounce(() => {
-        if (input.classList.contains('error')) {
-          validateField(input);
-        }
-      }, config.performance.debounceDelay));
+      input.addEventListener(
+        'input',
+        debounce(() => {
+          if (input.classList.contains('error')) {
+            validateField(input);
+          }
+        }, config.performance.debounceDelay)
+      );
     });
   });
 }
@@ -101,7 +104,7 @@ function handleFormSubmit(event) {
   const inputs = form.querySelectorAll('input[required], textarea[required], select[required]');
   let isValid = true;
 
-  inputs.forEach(input => {
+  inputs.forEach((input) => {
     if (!validateField(input)) {
       isValid = false;
     }
@@ -201,7 +204,7 @@ function displayFilePreview(file, container) {
 function initializeLazyLoading() {
   if ('IntersectionObserver' in window) {
     const imageObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
+      entries.forEach((entry) => {
         if (entry.isIntersecting) {
           const img = entry.target;
           if (img.dataset.src) {
@@ -213,7 +216,7 @@ function initializeLazyLoading() {
       });
     });
 
-    document.querySelectorAll('img[data-src]').forEach(img => {
+    document.querySelectorAll('img[data-src]').forEach((img) => {
       imageObserver.observe(img);
     });
   }
@@ -235,10 +238,14 @@ function initializeAnalytics() {
 
 function startPerformanceMonitoring() {
   // Record first interaction
-  document.addEventListener('click', function recordFirstClick() {
-    performanceMetrics.firstInteraction = performance.now();
-    document.removeEventListener('click', recordFirstClick);
-  }, { once: true });
+  document.addEventListener(
+    'click',
+    function recordFirstClick() {
+      performanceMetrics.firstInteraction = performance.now();
+      document.removeEventListener('click', recordFirstClick);
+    },
+    { once: true }
+  );
 
   // Monitor memory usage
   if ('memory' in performance) {
@@ -265,20 +272,20 @@ function handleContentGeneration(form) {
     },
     body: JSON.stringify(data)
   })
-  .then(response => response.json())
-  .then(result => {
-    hideLoadingIndicator();
-    if (result.success) {
-      displayGeneratedContent(result.content);
-    } else {
-      showNotification(result.error || 'Failed to generate content', 'error');
-    }
-  })
-  .catch(error => {
-    hideLoadingIndicator();
-    showNotification('Network error occurred', 'error');
-    console.error('Generation error:', error);
-  });
+    .then((response) => response.json())
+    .then((result) => {
+      hideLoadingIndicator();
+      if (result.success) {
+        displayGeneratedContent(result.content);
+      } else {
+        showNotification(result.error || 'Failed to generate content', 'error');
+      }
+    })
+    .catch((error) => {
+      hideLoadingIndicator();
+      showNotification('Network error occurred', 'error');
+      console.error('Generation error:', error);
+    });
 }
 
 function displayGeneratedContent(content) {
@@ -307,12 +314,15 @@ function displayGeneratedContent(content) {
 function formatContent(content) {
   if (typeof content === 'object') {
     // Handle multiple platform content
-    return Object.entries(content).map(([platform, text]) => 
-      `<div class="platform-content">
+    return Object.entries(content)
+      .map(
+        ([platform, text]) =>
+          `<div class="platform-content">
         <h4>${platform}</h4>
         <p>${escapeHtml(text)}</p>
       </div>`
-    ).join('');
+      )
+      .join('');
   }
 
   return `<p>${escapeHtml(content)}</p>`;
@@ -427,26 +437,29 @@ function formatFileSize(bytes) {
 
 function escapeHtml(unsafe) {
   return unsafe
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 function copyToClipboard(text) {
-  navigator.clipboard.writeText(text).then(() => {
-    showNotification('Content copied to clipboard', 'success');
-  }).catch(() => {
-    // Fallback for older browsers
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textarea);
-    showNotification('Content copied to clipboard', 'success');
-  });
+  navigator.clipboard
+    .writeText(text)
+    .then(() => {
+      showNotification('Content copied to clipboard', 'success');
+    })
+    .catch(() => {
+      // Fallback for older browsers
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      showNotification('Content copied to clipboard', 'success');
+    });
 }
 
 function downloadContent(content) {
@@ -477,7 +490,7 @@ function trackEvent(eventName, data) {
 function cleanupCache() {
   const now = Date.now();
   for (const [key, value] of cache.entries()) {
-    if (value.timestamp && (now - value.timestamp) > config.cacheTTL) {
+    if (value.timestamp && now - value.timestamp > config.cacheTTL) {
       cache.delete(key);
     }
   }

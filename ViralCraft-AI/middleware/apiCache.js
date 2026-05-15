@@ -1,10 +1,10 @@
-
 const enhancedCache = require('../services/enhancedCacheService');
 
 /**
  * API Response Caching Middleware
  */
-function apiCache(duration = 300000) { // Default 5 minutes
+function apiCache(duration = 300000) {
+  // Default 5 minutes
   return (req, res, next) => {
     // Only cache GET requests
     if (req.method !== 'GET') {
@@ -24,13 +24,13 @@ function apiCache(duration = 300000) { // Default 5 minutes
     const originalJson = res.json;
 
     // Override json method to cache response
-    res.json = function(data) {
+    res.json = function (data) {
       // Only cache successful responses
       if (res.statusCode >= 200 && res.statusCode < 300) {
         enhancedCache.set(cacheKey, data, duration);
         res.setHeader('X-Cache-Status', 'MISS');
       }
-      
+
       // Call original json method
       return originalJson.call(this, data);
     };

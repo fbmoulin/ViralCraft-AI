@@ -20,9 +20,9 @@ router.post('/analyze', async (req, res) => {
     const { videoUrl } = req.body;
 
     if (!videoUrl) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Video URL is required' 
+      return res.status(400).json({
+        success: false,
+        error: 'Video URL is required'
       });
     }
 
@@ -43,9 +43,9 @@ router.post('/analyze', async (req, res) => {
     });
   } catch (error) {
     console.error('YouTube analysis error:', error);
-    return res.status(500).json({ 
-      success: false, 
-      error: error.message || 'Failed to analyze YouTube video' 
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to analyze YouTube video'
     });
   }
 });
@@ -60,7 +60,7 @@ router.get('/analyses', async (req, res) => {
     res.json({ success: true, analyses });
   } catch (error) {
     console.error('Error fetching analyses:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: error.message || 'Failed to retrieve analyzed videos'
     });
@@ -77,18 +77,18 @@ router.get('/analysis/:id', async (req, res) => {
     const analysis = await YouTubeAnalyzer.getAnalysisById(id);
 
     if (!analysis) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        error: 'Analysis not found' 
+        error: 'Analysis not found'
       });
     }
 
     res.json({ success: true, analysis });
   } catch (error) {
     console.error('Error fetching analysis:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: error.message || 'Failed to retrieve YouTube analysis' 
+      error: error.message || 'Failed to retrieve YouTube analysis'
     });
   }
 });

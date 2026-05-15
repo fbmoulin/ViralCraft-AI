@@ -1,25 +1,24 @@
-
 const { Sequelize } = require('sequelize');
 require('dotenv').config();
 
 async function setupDatabase() {
   console.log('🗄️ Setting up database...');
-  
+
   try {
     // Initialize database service
     const databaseService = require('../services/database');
-    
+
     // Initialize connection and create tables
     const connected = await databaseService.initialize();
-    
+
     if (connected) {
       console.log('✅ Database setup completed successfully');
-      
+
       // Create some sample data if tables are empty
       const contentCount = await databaseService.models.Content.count();
       if (contentCount === 0) {
         console.log('📝 Creating sample content...');
-        
+
         await databaseService.createContent({
           title: 'Welcome to ViralCraft-AI',
           type: 'social',
@@ -33,10 +32,10 @@ async function setupDatabase() {
           viralScore: 75,
           status: 'published'
         });
-        
+
         console.log('✅ Sample content created');
       }
-      
+
       // Display database info
       const healthCheck = await databaseService.healthCheck();
       console.log('📊 Database status:', healthCheck);
@@ -49,17 +48,15 @@ async function setupDatabase() {
       } catch (error) {
         console.warn('⚠️ API integration test failed:', error.message);
       }
-      
     } else {
       console.error('❌ Failed to setup database');
       process.exit(1);
     }
-    
   } catch (error) {
     console.error('❌ Database setup error:', error.message);
     process.exit(1);
   }
-  
+
   process.exit(0);
 }
 
@@ -68,4 +65,4 @@ if (require.main === module) {
   setupDatabase();
 }
 
-module.exports = setupDatabase;dule.exports = setupDatabase;
+module.exports = setupDatabase;
