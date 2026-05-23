@@ -3,6 +3,8 @@
  * services/database.js. Centralizes data access so routes can stay focused on
  * HTTP concerns. All methods return plain JSON objects (no Sequelize instances).
  */
+const { Op } = require('sequelize');
+
 class ContentRepository {
   get db() {
     return global.db;
@@ -47,21 +49,38 @@ class ContentRepository {
     return this.findAll({ platform });
   }
 
-  async search(query) {
+  /**
+   * Ownership-scoped, SQL-side substring search across title and the JSON
+   * content column. The previous `search()` loaded 100 rows across all tenants
+   * and filtered in JS — a cross-tenant data leak. Callers must pass the
+   * ownership filter from `ownershipFilter(req)` in routes/contentRoutes.js.
+   *
+   * Uses `Op.iLike` on Postgres for case-insensitive match; falls back to
+   * `Op.like` on SQLite (case-insensitive by default for ASCII).
+   */
+  async searchScoped(query, ownership = {}) {
     if (!query || typeof query !== 'string') return [];
-    const items = await this.findAll({}, { limit: 100 });
-    const lower = query.toLowerCase();
-    return items.filter((item) => {
-      if (!item) return false;
-      const haystack = [
-        item.title,
-        typeof item.content === 'string' ? item.content : JSON.stringify(item.content || ''),
-        Array.isArray(item.keywords) ? item.keywords.join(' ') : ''
-      ]
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(lower);
-    });
+    this.ensureConnected();
+
+    const dialect = this.db.sequelize?.getDialect?.() || 'sqlite';
+    const likeOp = dialect === 'postgres' ? Op.iLike : Op.like;
+    const needle = `%${query.replace(/[%_\\]/g, '\\$&')}%`;
+
+    const where = {
+      ...ownership,
+      [Op.or]: [{ title: { [likeOp]: needle } }, { content: { [likeOp]: needle } }]
+    };
+
+    return this.db.getContent(where, { limit: 50, offset: 0, include: [] });
+  }
+
+  /**
+   * Backwards-compatible wrapper retained only so legacy callers don't blow up.
+   * New code MUST use `searchScoped` with an ownership filter — this version
+   * returns nothing rather than leaking other tenants' rows.
+   */
+  async search(_query) {
+    return [];
   }
 }
 

@@ -13,6 +13,7 @@ const logger = require('./utils/logger');
 const requestId = require('./middleware/requestId');
 const sentry = require('./services/sentry');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
+const { requireDebugToken } = require('./middleware/requireDebugToken');
 const cache = require('./services/cache');
 const {
   systemMonitoring,
@@ -608,7 +609,7 @@ app.post('/api/suggest', aiRateLimiter, requireAuth, enforceQuota(), async (req,
 });
 
 // Real-time error monitoring
-app.get('/api/errors/realtime', readRateLimiter, async (req, res) => {
+app.get('/api/errors/realtime', readRateLimiter, requireDebugToken, async (req, res) => {
   try {
     const healthData = getHealthData();
     const recentErrors = healthData.logs.lastErrors || [];

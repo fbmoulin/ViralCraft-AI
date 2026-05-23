@@ -3,6 +3,11 @@ const router = express.Router();
 const path = require('path');
 const fs = require('fs');
 const logger = require('../utils/logger');
+const { requireDebugToken } = require('../middleware/requireDebugToken');
+
+// Logs endpoints expose error stacks, log file names and the reset action.
+// Treat the entire namespace as ops-only: same gate as /api/debug.
+router.use(requireDebugToken);
 
 // Get recent logs
 router.get('/recent', (req, res) => {
